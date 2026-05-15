@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CareTrack - Staff Login</title>
+  <meta name="description" content="Authorized CareTrack clinic staff login.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/caretrack.css">
+</head>
+<body class="auth-page">
+  <main class="auth-layout">
+    <section class="auth-brand">
+      <a class="ct-logo ct-logo-full" href="../index.html" aria-label="CareTrack">
+        <img class="ct-logo-image" src="../assets/img/logo.png" width="168" height="64" alt="CareTrack">
+      </a>
+
+      <div class="auth-brand-main">
+        <span class="badge cyan">Protected medical access</span>
+        <h1>Welcome back</h1>
+        <p>Sign in to manage clinic records securely. Access is limited to registered administrators, clinicians, doctors, nurses, and reception staff.</p>
+        <div class="pulse-line" style="margin-top:28px"></div>
+      </div>
+
+      <p class="security-note">No public patient registration is available. Staff accounts must exist in Firebase Auth and the CareTrack RTD registration tree.</p>
+    </section>
+
+    <section class="auth-card-wrap">
+      <div class="auth-card">
+        <img class="ct-logo-image auth-card-logo" src="../assets/img/logo.png" width="156" height="60" alt="CareTrack">
+        <h2>Staff Login</h2>
+        <p>Use your clinic-issued email and password.</p>
+
+        <form class="auth-form" id="loginForm">
+          <div class="auth-error" id="authError"></div>
+          <div class="field">
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" autocomplete="email" placeholder="name@clinic.com" required>
+          </div>
+          <div class="field">
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
+          </div>
+          <div class="auth-options">
+            <label><input id="remember" name="remember" type="checkbox"> Remember me</label>
+            <a href="#" id="resetPassword">Forgot password?</a>
+          </div>
+          <button class="btn primary" type="submit">Sign In</button>
+        </form>
+
+        <p class="security-note">Protected medical access for authorized clinic staff only.</p>
+      </div>
+    </section>
+  </main>
+  <script defer src="../assets/js/caretrack-runtime.js"></script>
+  <script type="module" src="../assets/js/caretrack-auth.js"></script>
+</body>
+</html>

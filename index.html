@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CareTrack - Secure Medical Records Management</title>
+  <meta name="description" content="CareTrack is a secure medical records management system for authorized clinic staff.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/caretrack.css">
+</head>
+<body class="public-page">
+  <nav class="public-nav">
+    <a class="ct-logo ct-logo-full" href="index.html" aria-label="CareTrack">
+      <img class="ct-logo-image" src="assets/img/logo.png" widtrrr5r54h="168" height="64" alt="CareTrack">
+    </a>
+    <a class="btn primary" href="auth/index.html">Staff Login</a>
+  </nav>
+
+  <main class="public-hero">
+    <section class="hero-copy">
+      <p class="eyebrow">Private Clinic Management</p>
+      <h1>Secure Medical Records Management for Modern Clinics</h1>
+      <p>CareTrack helps authorized clinic staff manage doctors, patient records, diagnoses, schedules, reports, and role-based access from one secure healthcare dashboard.</p>
+      <div class="hero-actions">
+        <a class="btn primary" href="auth/index.html">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Staff Login
+        </a>
+        <a class="btn" href="#features">Learn More</a>
+      </div>
+    </section>
+
+    <section class="hero-dashboard" aria-label="CareTrack dashboard preview">
+      <div class="hero-dashboard-top">
+        <span class="badge cyan">Administrator</span>
+        <span class="badge green">Secure Access</span>
+      </div>
+      <div class="hero-dashboard-body">
+        <div class="grid stats">
+          <div class="stat-card cyan"><div class="stat-top"><span class="stat-label">Doctors</span></div><div class="stat-value">48</div><div class="stat-note">Clinical profiles</div></div>
+          <div class="stat-card teal"><div class="stat-top"><span class="stat-label">Patients</span></div><div class="stat-value">2.8K</div><div class="stat-note">Protected records</div></div>
+          <div class="stat-card blue"><div class="stat-top"><span class="stat-label">Diagnoses</span></div><div class="stat-value">312</div><div class="stat-note">Active cases</div></div>
+          <div class="stat-card rose"><div class="stat-top"><span class="stat-label">Critical</span></div><div class="stat-value">8</div><div class="stat-note">Needs review</div></div>
+        </div>
+        <div class="pulse-line" style="margin:24px 0 0"></div>
+      </div>
+    </section>
+  </main>
+
+  <section class="public-hero" id="features" style="min-height:auto;display:block;padding-top:0">
+    <div class="hero-feature-grid">
+      <article class="feature-card">
+        <h3>Doctor Management</h3>
+        <p>Maintain doctor profiles, departments, contact details, room assignments, and availability.</p>
+      </article>
+      <article class="feature-card">
+        <h3>Patient Records</h3>
+        <p>Register patients, manage demographics, emergency contacts, and doctor assignments securely.</p>
+      </article>
+      <article class="feature-card">
+        <h3>Diagnosis Tracking</h3>
+        <p>Link ICD-coded diagnosis records, severity, clinical notes, and follow-ups to patient profiles.</p>
+      </article>
+      <article class="feature-card">
+        <h3>Role-Based Security</h3>
+        <p>Administrator, clinician, doctor, nurse, and receptionist access is controlled through Firebase Auth and RTD registration.</p>
+      </article>
+    </div>
+  </section>
+
+  <footer class="public-footer">
+    CareTrack MRMS is for authorized clinic staff only. Patient/public registration is not available from this site.
+  </footer>
+  <script defer src="assets/js/caretrack-runtime.js"></script>
+</body>
+</html>

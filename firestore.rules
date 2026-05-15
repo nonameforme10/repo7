@@ -1,0 +1,110 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function role() {
+      return signedIn() ? request.auth.token.role : null;
+    }
+
+    function clinicId() {
+      return signedIn() ? request.auth.token.clinicId : null;
+    }
+
+    function activeStaff() {
+      return signedIn()
+        && request.auth.token.status == "active"
+        && request.auth.token.active == true;
+    }
+
+    function inClinic(clinic) {
+      return activeStaff() && clinicId() == clinic;
+    }
+
+    function isAdmin(clinic) {
+      return inClinic(clinic) && role() == "administrator";
+    }
+
+    function isClinician(clinic) {
+      return inClinic(clinic) && role() == "clinician";
+    }
+
+    function isReceptionist(clinic) {
+      return inClinic(clinic) && role() == "receptionist";
+    }
+
+    function isClinicStaff(clinic) {
+      return isAdmin(clinic) || isClinician(clinic) || isReceptionist(clinic);
+    }
+
+    function changedOnly(allowed) {
+      return request.resource.data.diff(resource.data).changedKeys().hasOnly(allowed);
+    }
+
+    match /clinics/{clinic} {
+      allow read: if isClinicStaff(clinic);
+      allow create, update, delete: if isAdmin(clinic);
+
+      match /staffProfiles/{uid} {
+        allow read: if isClinicStaff(clinic);
+        allow create, update, delete: if isAdmin(clinic);
+      }
+
+      match /doctors/{doctorId} {
+        allow read: if isClinicStaff(clinic);
+        allow create, update, delete: if isAdmin(clinic);
+      }
+
+      match /patients/{patientId} {
+        allow read: if isClinicStaff(clinic);
+        allow create: if isAdmin(clinic) || isReceptionist(clinic);
+        allow update: if isAdmin(clinic)
+          || (isReceptionist(clinic) && changedOnly([
+            "firstName", "lastName", "dateOfBirth", "age", "gender",
+            "phone", "email", "address", "emergencyContactName",
+            "emergencyContactPhone", "assignedDoctorId", "assignedDoctorName",
+            "department", "registrationNotes", "status", "lastUpdated",
+            "updatedAt", "updatedBy", "clinicId"
+          ]));
+        allow delete: if isAdmin(clinic);
+      }
+
+      match /diagnoses/{diagnosisId} {
+        allow read: if isClinicStaff(clinic);
+        allow create, update: if isAdmin(clinic) || isClinician(clinic);
+        allow delete: if isAdmin(clinic);
+      }
+
+      match /schedules/{scheduleId} {
+        allow read: if isClinicStaff(clinic);
+        allow create, update, delete: if isAdmin(clinic);
+      }
+
+      match /reports/{reportId} {
+        allow read: if isClinicStaff(clinic);
+        allow create: if isClinicStaff(clinic);
+        allow update, delete: if isAdmin(clinic);
+      }
+
+      match /settings/{settingsId} {
+        allow read: if isClinicStaff(clinic);
+        allow create, update, delete: if isAdmin(clinic);
+      }
+
+      match /auditLogs/{auditId} {
+        allow read: if isAdmin(clinic);
+        allow create: if isClinicStaff(clinic)
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.role == role();
+        allow update, delete: if false;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

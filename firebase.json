@@ -1,0 +1,35 @@
+{
+  "functions": {
+    "source": "functions"
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "database": {
+    "rules": "rtdrules.json"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "functions/**",
+      "firestore.rules",
+      "firestore.indexes.json",
+      "rtdrules.json",
+      "storage.rules",
+      "package.json",
+      "package-lock.json",
+      "deploy.bat",
+      "prompt*",
+      "tests/**",
+      "test-results/**",
+      "playwright-report/**"
+    ]
+  }
+}

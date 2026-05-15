@@ -1,0 +1,45 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function activeStaff() {
+      return signedIn()
+        && request.auth.token.status == "active"
+        && request.auth.token.active == true;
+    }
+
+    function inClinic(clinic) {
+      return activeStaff() && request.auth.token.clinicId == clinic;
+    }
+
+    function isAdmin(clinic) {
+      return inClinic(clinic) && request.auth.token.role == "administrator";
+    }
+
+    function isClinician(clinic) {
+      return inClinic(clinic) && request.auth.token.role == "clinician";
+    }
+
+    function isReceptionist(clinic) {
+      return inClinic(clinic) && request.auth.token.role == "receptionist";
+    }
+
+    match /clinics/{clinic}/patients/{patientId}/{allPaths=**} {
+      allow read: if inClinic(clinic);
+      allow write: if isAdmin(clinic) || isClinician(clinic) || isReceptionist(clinic);
+    }
+
+    match /clinics/{clinic}/reports/{allPaths=**} {
+      allow read: if inClinic(clinic);
+      allow write: if isAdmin(clinic) || isClinician(clinic);
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

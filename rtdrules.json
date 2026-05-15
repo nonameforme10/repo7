@@ -1,0 +1,32 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "registration": {
+      "admin": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'administrator')",
+          ".write": "auth != null && auth.uid === $uid && data.exists() && newData.child('uid').val() === data.child('uid').val() && newData.child('email').val() === data.child('email').val() && newData.child('active').val() === data.child('active').val() && newData.child('role').val() === data.child('role').val() && newData.child('staffType').val() === data.child('staffType').val() && newData.child('clinicId').val() === data.child('clinicId').val()",
+          ".validate": "newData.hasChildren(['uid', 'email', 'active', 'role', 'staffType', 'clinicId'])"
+        }
+      },
+      "clinicks": {
+        "$staffType": {
+          "$uid": {
+            ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'administrator')",
+            ".write": "auth != null && auth.uid === $uid && data.exists() && newData.child('uid').val() === data.child('uid').val() && newData.child('email').val() === data.child('email').val() && newData.child('active').val() === data.child('active').val() && newData.child('role').val() === data.child('role').val() && newData.child('staffType').val() === data.child('staffType').val() && newData.child('clinicId').val() === data.child('clinicId').val()",
+            ".validate": "newData.hasChildren(['uid', 'email', 'active', 'role', 'staffType', 'clinicId'])"
+          }
+        }
+      }
+    },
+    "access": {
+      "users": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'administrator')",
+          ".write": false
+        }
+      }
+    }
+  }
+}

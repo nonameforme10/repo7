@@ -1,0 +1,25 @@
+{
+  "scripts": {
+    "dev": "node server.js --dev",
+    "build": "next build",
+    "start": "node server.js",
+    "serve": "node server.js --dev",
+    "test:e2e": "playwright test",
+    "deploy:functions": "firebase deploy --only functions",
+    "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes,database,storage",
+    "deploy:hosting": "firebase deploy --only hosting",
+    "deploy:firebase": "firebase deploy",
+    "deploy:vercel:prod": "vercel --prod"
+  },
+  "dependencies": {
+    "compression": "^1.8.1",
+    "express": "^5.2.1",
+    "firebase": "^12.13.0",
+    "next": "^16.2.6",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0"
+  }
+}
