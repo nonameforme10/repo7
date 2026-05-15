@@ -12,21 +12,15 @@ import {
   signOut,
 } from "firebase/auth";
 import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  getFirestore,
-  limit,
-  orderBy,
-  query,
+  get,
+  getDatabase,
+  push,
+  ref,
+  remove,
   serverTimestamp,
-  setDoc,
-  where,
-} from "firebase/firestore";
-import { get, getDatabase, ref, update } from "firebase/database";
+  set,
+  update,
+} from "firebase/database";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { getDownloadURL, getStorage, ref as storageRef, uploadBytes } from "firebase/storage";
 
@@ -44,36 +38,27 @@ export const firebaseConfig = {
 export const defaultClinicId = "default";
 export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
 export const rtdb = getDatabase(app);
 export const functions = getFunctions(app);
 export const storage = getStorage(app);
 
 export {
-  addDoc,
   browserLocalPersistence,
   browserSessionPersistence,
-  collection,
-  deleteDoc,
-  doc,
   get,
-  getDoc,
-  getDocs,
   getDownloadURL,
   httpsCallable,
-  limit,
   onAuthStateChanged,
-  orderBy,
-  query,
+  push,
   ref,
+  remove,
   sendPasswordResetEmail,
   serverTimestamp,
-  setDoc,
+  set,
   setPersistence,
   signInWithEmailAndPassword,
   signOut,
   storageRef,
   update,
   uploadBytes,
-  where,
 };

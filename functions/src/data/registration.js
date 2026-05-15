@@ -22,12 +22,17 @@ function roleForStaffType(staffType) {
 
 function registrationPath(uid, staffType) {
   if (staffType === "admin") return `registration/admin/${uid}`;
-  return `registration/clinicks/${staffType}/${uid}`;
+  if (staffType === "reception") return `registration/receptionist/${uid}`;
+  if (staffType === "nurse") return `registration/nurses/${uid}`;
+  return `registration/doctors/${uid}`;
 }
 
 function registrationPaths(uid) {
   return [
     `registration/admin/${uid}`,
+    `registration/doctors/${uid}`,
+    `registration/receptionist/${uid}`,
+    `registration/nurses/${uid}`,
     `registration/clinicks/doctor/${uid}`,
     `registration/clinicks/nurse/${uid}`,
     `registration/clinicks/reception/${uid}`,
@@ -36,7 +41,11 @@ function registrationPaths(uid) {
 
 function staffTypeFromPath(path) {
   const parts = String(path || "").split("/");
-  return normalizeStaffType(parts[1] === "admin" ? "admin" : parts[2]);
+  if (parts[1] === "admin") return "admin";
+  if (parts[1] === "doctors") return "doctor";
+  if (parts[1] === "receptionist") return "reception";
+  if (parts[1] === "nurses") return "nurse";
+  return normalizeStaffType(parts[2]);
 }
 
 async function findRegistration(uid) {
@@ -57,11 +66,14 @@ async function findRegistration(uid) {
 async function listRegistrations() {
   const groups = [
     ["admin", "registration/admin"],
+    ["doctor", "registration/doctors"],
+    ["reception", "registration/receptionist"],
+    ["nurse", "registration/nurses"],
     ["doctor", "registration/clinicks/doctor"],
-    ["nurse", "registration/clinicks/nurse"],
     ["reception", "registration/clinicks/reception"],
+    ["nurse", "registration/clinicks/nurse"],
   ];
-  const users = [];
+  const usersByUid = new Map();
 
   for (const [staffType, path] of groups) {
     const snapshot = await rtdb.ref(path).get();
@@ -69,7 +81,8 @@ async function listRegistrations() {
 
     Object.entries(snapshot.val() || {}).forEach(([uid, value]) => {
       const cleanStaffType = normalizeStaffType(value.staffType || staffType);
-      users.push({
+      if (usersByUid.has(uid)) return;
+      usersByUid.set(uid, {
         uid,
         id: uid,
         path: `${path}/${uid}`,
@@ -80,7 +93,7 @@ async function listRegistrations() {
     });
   }
 
-  return users.sort((left, right) => {
+  return [...usersByUid.values()].sort((left, right) => {
     const a = String(left.displayName || left.email || left.uid);
     const b = String(right.displayName || right.email || right.uid);
     return a.localeCompare(b);

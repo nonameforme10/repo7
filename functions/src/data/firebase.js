@@ -11,14 +11,11 @@ if (!admin.apps.length) {
 }
 
 const auth = admin.auth();
-const firestore = admin.firestore();
 const rtdb = admin.database();
 
 module.exports = {
   admin,
   auth,
-  firestore,
   rtdb,
-  FieldValue: admin.firestore.FieldValue,
   RtdServerValue: admin.database.ServerValue,
 };

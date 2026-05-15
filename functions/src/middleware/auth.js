@@ -15,20 +15,22 @@ async function requireAdministrator(request) {
   const signedIn = requireSignedIn(request);
   const token = signedIn.token || {};
   const fromClaims = token.role === "administrator" && token.status === "active";
+  let registration = null;
 
   if (!fromClaims) {
     const adminRegistration = await rtdb.ref(`registration/admin/${signedIn.uid}`).get();
     if (!adminRegistration.exists() || adminRegistration.child("active").val() !== true) {
       throw new HttpsError("permission-denied", "Administrator access is required.");
     }
+    registration = adminRegistration.val() || {};
   }
 
   return {
     uid: signedIn.uid,
-    email: token.email || "",
-    name: token.name || token.email || signedIn.uid,
+    email: token.email || registration?.email || "",
+    name: token.name || registration?.displayName || token.email || signedIn.uid,
     role: "administrator",
-    clinicId: token.clinicId || DEFAULT_CLINIC_ID,
+    clinicId: token.clinicId || registration?.clinicId || DEFAULT_CLINIC_ID,
   };
 }
 

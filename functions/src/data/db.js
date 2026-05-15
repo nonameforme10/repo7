@@ -1,6 +1,6 @@
 "use strict";
 
-const {auth, FieldValue, firestore, rtdb, RtdServerValue} = require("./firebase");
+const {auth, rtdb, RtdServerValue} = require("./firebase");
 const {
   DEFAULT_CLINIC_ID,
   findRegistration,
@@ -13,18 +13,6 @@ const {
   roleForStaffType,
   upsertRegistration,
 } = require("./registration");
-
-function clinicRef(clinicId = DEFAULT_CLINIC_ID) {
-  return firestore.collection("clinics").doc(clinicId || DEFAULT_CLINIC_ID);
-}
-
-function staffProfileRef(clinicId, uid) {
-  return clinicRef(clinicId).collection("staffProfiles").doc(uid);
-}
-
-function auditLogsRef(clinicId) {
-  return clinicRef(clinicId).collection("auditLogs");
-}
 
 async function getAuthUserByUid(uid) {
   return auth.getUser(uid);
@@ -52,25 +40,20 @@ async function updateAuthUser(uid, {displayName, active}) {
 }
 
 async function saveStaffProfile(clinicId, uid, payload) {
-  await staffProfileRef(clinicId, uid).set({
+  await rtdb.ref(`staffProfiles/${uid}`).update({
     ...payload,
-    updatedAt: FieldValue.serverTimestamp(),
-  }, {merge: true});
+    clinicId: clinicId || DEFAULT_CLINIC_ID,
+    updatedAt: RtdServerValue.TIMESTAMP,
+  });
 }
 
 async function writeAudit(clinicId, actor, action, entity, entityId, details = {}) {
-  await auditLogsRef(clinicId).add({
-    action,
-    entity,
-    entityId,
-    details,
-    userId: actor.uid,
-    userName: actor.name || actor.email || actor.uid,
-    role: actor.role || "administrator",
-    device: "Cloud Functions",
-    timestamp: FieldValue.serverTimestamp(),
-    createdAt: FieldValue.serverTimestamp(),
-  });
+  void clinicId;
+  void actor;
+  void action;
+  void entity;
+  void entityId;
+  void details;
 }
 
 async function markRegistrationLogin(path, email) {
@@ -94,10 +77,8 @@ async function disableRegistration(path, actorUid) {
 
 module.exports = {
   DEFAULT_CLINIC_ID,
-  FieldValue,
   RtdServerValue,
   auth,
-  firestore,
   rtdb,
   createAuthUser,
   disableRegistration,

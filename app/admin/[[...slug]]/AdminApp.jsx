@@ -2,29 +2,23 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  addDoc,
   auth,
-  collection,
-  db,
   defaultClinicId,
-  deleteDoc,
-  doc,
   get,
-  getDoc,
-  getDocs,
   functions,
+  getDownloadURL,
   httpsCallable,
   onAuthStateChanged,
-  query,
+  push,
   ref,
+  remove,
   rtdb,
   serverTimestamp,
-  setDoc,
+  set,
   signOut,
   storage,
   storageRef,
   uploadBytes,
-  getDownloadURL,
 } from "../../lib/firebase-client";
 
 const logoUrl = "/assets/img/logo.png";
@@ -47,7 +41,6 @@ const navItems = [
   { key: "schedules", path: "/admin/schedules", label: "Schedules", icon: "calendar", roles: ["administrator", "clinician", "receptionist"], group: "Main" },
   { key: "users", path: "/admin/users", label: "User Management", icon: "shield", roles: ["administrator"], group: "System" },
   { key: "settings", path: "/admin/settings", label: "Settings", icon: "settings", roles: ["administrator"], group: "System" },
-  { key: "audit", path: "/admin/audit", label: "Audit Logs", icon: "audit", roles: ["administrator"], group: "System" },
 ];
 
 const pageInfo = {
@@ -63,7 +56,6 @@ const pageInfo = {
   schedules: { nav: "schedules", title: "Schedules", subtitle: "View doctor availability and working hours.", roles: ["administrator", "clinician", "receptionist"] },
   users: { nav: "users", title: "User Management", subtitle: "Manage clinic staff accounts and access.", roles: ["administrator"] },
   settings: { nav: "settings", title: "Settings", subtitle: "Configure clinic profile, departments, specialties, and defaults.", roles: ["administrator"] },
-  audit: { nav: "audit", title: "Audit Logs", subtitle: "Track important actions performed in the medical records system.", roles: ["administrator"] },
   "access-denied": { nav: null, title: "Access Denied", subtitle: "You do not have permission to view this page.", roles: [] },
 };
 
@@ -85,12 +77,10 @@ const samples = {
     { id: "sch-2", doctorName: "Dr. Sarah Chen", department: "Neurology", day: "Tuesday", startTime: "10:00", endTime: "17:00", room: "N-118", status: "Busy" },
   ],
   users: [],
-  auditLogs: [],
 };
 
 const icons = {
   activity: <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>,
-  audit: <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>,
   bell: <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>,
   calendar: <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>,
   chart: <svg viewBox="0 0 24 24"><path d="M3 3v18h18" /><path d="M7 14l4-4 3 3 5-7" /></svg>,
@@ -108,7 +98,7 @@ const icons = {
 function cleanSlug(value = "") {
   const slug = String(value || "").replace(/\.html$/, "");
   if (!slug || slug === "admin") return "dashboard";
-  if (slug === "audit-logs") return "audit";
+  if (slug === "audit-logs" || slug === "audit") return "dashboard";
   return slug;
 }
 
@@ -136,7 +126,6 @@ function pageUrl(page, params = {}) {
     schedules: "/admin/schedules",
     users: "/admin/users",
     settings: "/admin/settings",
-    audit: "/admin/audit",
     "access-denied": "/admin/access-denied",
   };
   const qs = new URLSearchParams(params).toString();
@@ -165,15 +154,17 @@ function staffTypeForRole(role, preferred = "") {
 
 function inferRegistration(path = "") {
   if (path.includes("/admin/")) return { role: "administrator", staffType: "admin" };
-  if (path.includes("/doctor/")) return { role: "clinician", staffType: "doctor" };
+  if (path.includes("/doctor/") || path.includes("/doctors/")) return { role: "clinician", staffType: "doctor" };
   if (path.includes("/nurse/")) return { role: "clinician", staffType: "nurse" };
-  if (path.includes("/reception/")) return { role: "receptionist", staffType: "reception" };
+  if (path.includes("/reception/") || path.includes("/receptionist/")) return { role: "receptionist", staffType: "reception" };
   return { role: "", staffType: "" };
 }
 
 async function loadRegistration(user) {
   const paths = [
     `registration/admin/${user.uid}`,
+    `registration/doctors/${user.uid}`,
+    `registration/receptionist/${user.uid}`,
     `registration/clinicks/doctor/${user.uid}`,
     `registration/clinicks/nurse/${user.uid}`,
     `registration/clinicks/reception/${user.uid}`,
@@ -261,6 +252,30 @@ function isDefaultProfileImage(url = "") {
 
 function profileImageFor(record = {}, type) {
   return record.photoUrl || record.imageUrl || record.avatarUrl || defaultProfileImage(type, record.gender);
+}
+
+function recordFromRtdValue(id, value = {}, path = "") {
+  const data = value || {};
+  const legacyId = data.id && data.id !== id ? data.id : data.legacyId;
+  return { ...data, legacyId, id, docId: id, uid: data.uid || id, _path: path ? `${path}/${id}` : "" };
+}
+
+function recordId(record) {
+  return String(record?.docId || record?.id || "");
+}
+
+function collectionPaths(name) {
+  if (name === "doctors") return ["registration/doctors", "registration/clinicks/doctor"];
+  if (name === "users") return ["registration/admin", "registration/doctors", "registration/receptionist", "registration/clinicks/doctor", "registration/clinicks/reception"];
+  return [name];
+}
+
+function primaryCollectionPath(name) {
+  return collectionPaths(name)[0];
+}
+
+function parentPath(path = "") {
+  return String(path || "").split("/").slice(0, -1).join("/");
 }
 
 function fileExtension(file) {
@@ -525,7 +540,7 @@ export default function AdminApp() {
 }
 
 function AdminPage({ page, config, params, profile, navigate, notify }) {
-  const [data, setData] = useState({ loading: true, doctors: [], patients: [], diagnoses: [], schedules: [], users: [], auditLogs: [] });
+  const [data, setData] = useState({ loading: true, doctors: [], patients: [], diagnoses: [], schedules: [], users: [] });
   const [deletingKey, setDeletingKey] = useState("");
   const clinicId = profile.clinicId || defaultClinicId;
 
@@ -533,7 +548,7 @@ function AdminPage({ page, config, params, profile, navigate, notify }) {
     let alive = true;
     async function load() {
       setData((current) => ({ ...current, loading: true }));
-      const names = ["doctors", "patients", "diagnoses", "schedules", "auditLogs"];
+      const names = ["doctors", "patients", "diagnoses", "schedules"];
       const entries = await Promise.all(names.map(async (name) => [name, await readCollection(clinicId, name)]));
       if (!alive) return;
       const next = Object.fromEntries(entries);
@@ -543,7 +558,6 @@ function AdminPage({ page, config, params, profile, navigate, notify }) {
         patients: next.patients,
         diagnoses: next.diagnoses,
         schedules: next.schedules,
-        auditLogs: next.auditLogs,
         users: [],
       });
     }
@@ -551,39 +565,57 @@ function AdminPage({ page, config, params, profile, navigate, notify }) {
     return () => { alive = false; };
   }, [clinicId, page]);
 
-  async function saveRecord(name, payload, id = "") {
+  async function saveRecord(name, payload, id = "", existingRecord = null) {
+    const basePath = parentPath(existingRecord?._path) || primaryCollectionPath(name);
+    const targetRef = id ? ref(rtdb, `${basePath}/${id}`) : push(ref(rtdb, basePath));
+    const targetId = id || targetRef.key;
     const body = {
       ...payload,
+      id: targetId,
       clinicId,
       updatedAt: serverTimestamp(),
       updatedBy: profile.uid,
     };
 
-    if (id) {
-      await setDoc(doc(db, "clinics", clinicId, name, id), body, { merge: true });
-      await writeAudit(clinicId, profile, "Updated", name, id, payload);
-      notify("Record updated.");
-      return id;
+    if (name === "doctors") {
+      body.uid = payload.uid || targetId;
+      body.role = payload.role || "clinician";
+      body.staffType = "doctor";
+      body.active = payload.active ?? true;
     }
 
-    const created = await addDoc(collection(db, "clinics", clinicId, name), {
+    if (name === "patients") {
+      body.uid = payload.uid || targetId;
+      body.registeredBy = payload.registeredBy || existingRecord?.registeredBy || profile.uid;
+      body.registeredByName = payload.registeredByName || existingRecord?.registeredByName || profile.displayName || profile.email || profile.uid;
+    }
+
+    if (existingRecord?._path) {
+      await update(targetRef, body);
+      notify("Record updated.");
+      return targetId;
+    }
+
+    await set(targetRef, {
       ...body,
       createdAt: serverTimestamp(),
       createdBy: profile.uid,
     });
-    await writeAudit(clinicId, profile, "Created", name, created.id, payload);
     notify("Record created.");
-    return created.id;
+    return targetId;
   }
 
-  async function removeRecord(name, id) {
+  async function removeRecord(name, recordOrId) {
+    const id = typeof recordOrId === "object" ? recordId(recordOrId) : String(recordOrId || "");
     if (!id || !window.confirm("Delete this record?")) return;
     const key = `${name}:${id}`;
     setDeletingKey(key);
     try {
-      await deleteDoc(doc(db, "clinics", clinicId, name, id));
-      await writeAudit(clinicId, profile, "Deleted", name, id, {});
-      setData((current) => ({ ...current, [name]: current[name].filter((item) => item.id !== id) }));
+      const path = typeof recordOrId === "object" && recordOrId?._path
+        ? recordOrId._path
+        : `${primaryCollectionPath(name)}/${id}`;
+      await remove(ref(rtdb, path));
+      setData((current) => ({ ...current, [name]: current[name].filter((item) => recordId(item) !== id) }));
       notify("Record deleted.");
     } catch (error) {
       console.error("CareTrack delete failed", error);
@@ -608,14 +640,29 @@ function AdminPage({ page, config, params, profile, navigate, notify }) {
   if (page === "schedules") return <SimpleRecordsPage config={config} collection="schedules" title="Doctor Schedules" rows={data.schedules} columns={["doctorName", "department", "day", "startTime", "endTime", "status"]} />;
   if (page === "users") return <SimpleRecordsPage config={config} collection="users" title="Staff Users" rows={data.users} columns={["displayName", "email", "role", "active"]} empty="Staff user management remains connected to Firebase callable functions." />;
   if (page === "settings") return <SettingsPage config={config} notify={notify} />;
-  if (page === "audit") return <SimpleRecordsPage config={config} collection="audit" title="Audit Logs" rows={data.auditLogs} columns={["action", "entity", "entityId", "userName"]} />;
   return <DashboardPage config={config} {...common} />;
 }
 
 async function readCollection(clinicId, name) {
   try {
-    const snapshot = await getDocs(query(collection(db, "clinics", clinicId, name)));
-    return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+    const records = [];
+    const seen = new Set();
+
+    for (const path of collectionPaths(name)) {
+      const snapshot = await get(ref(rtdb, path));
+      if (!snapshot.exists()) continue;
+
+      Object.entries(snapshot.val() || {}).forEach(([id, value]) => {
+        if (seen.has(id)) return;
+        const record = recordFromRtdValue(id, value, path);
+        if (!record.clinicId || record.clinicId === clinicId) {
+          seen.add(id);
+          records.push(record);
+        }
+      });
+    }
+
+    return records;
   } catch (error) {
     console.warn(`Using sample ${name} data`, error);
     return samples[name] || [];
@@ -625,30 +672,16 @@ async function readCollection(clinicId, name) {
 async function readOne(clinicId, name, id, fallback) {
   if (!id) return fallback || {};
   try {
-    const snapshot = await getDoc(doc(db, "clinics", clinicId, name, id));
-    return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : fallback || {};
+    for (const path of collectionPaths(name)) {
+      const snapshot = await get(ref(rtdb, `${path}/${id}`));
+      if (!snapshot.exists()) continue;
+      const record = recordFromRtdValue(id, snapshot.val(), path);
+      return !record.clinicId || record.clinicId === clinicId ? record : fallback || {};
+    }
+    return fallback || {};
   } catch (error) {
     console.warn(`Using sample ${name} document`, error);
     return fallback || {};
-  }
-}
-
-async function writeAudit(clinicId, profile, action, entity, entityId, details = {}) {
-  try {
-    await addDoc(collection(db, "clinics", clinicId, "auditLogs"), {
-      action,
-      entity,
-      entityId: String(entityId || ""),
-      details,
-      userId: profile.uid,
-      userName: profile.displayName || profile.email || profile.uid,
-      role: profile.role,
-      device: "React Admin",
-      timestamp: serverTimestamp(),
-      createdAt: serverTimestamp(),
-    });
-  } catch (error) {
-    console.warn("Audit write skipped", error);
   }
 }
 
@@ -696,19 +729,22 @@ function DoctorsPage({ config, data, navigate, removeRecord, profile, deletingKe
           columns={["Doctor Name", "Specialty", "Department", "Contact", "Assigned Patients", "Status", "Actions"]}
           rows={doctors}
           empty="No doctors found."
-          renderRow={(doctor) => [
-            <Entity key="name" name={doctorName(doctor)} note={doctor.room || doctor.officeRoom || "Room pending"} photoUrl={profileImageFor(doctor, "doctor")} />,
-            doctor.specialty || "-",
-            doctor.department || "-",
-            <span key="contact">{doctor.phone || "-"}<br /><span style={{ color: "var(--faint)" }}>{doctor.email || ""}</span></span>,
-            doctor.assignedPatients ?? 0,
-            statusBadge(doctor.status || "Available"),
-            <div className="row-actions" key="actions">
-              <button className="btn small" type="button" onClick={() => navigate("doctor-detail", { id: doctor.id })}>View</button>
-              {canEdit ? <button className="btn small" type="button" onClick={() => navigate("doctor-form", { id: doctor.id })}>Edit</button> : null}
-              {canEdit ? <button className="btn small danger" type="button" disabled={deletingKey === `doctors:${doctor.id}`} onClick={() => removeRecord("doctors", doctor.id)}>{deletingKey === `doctors:${doctor.id}` ? "Deleting..." : "Delete"}</button> : null}
-            </div>,
-          ]}
+          renderRow={(doctor) => {
+            const doctorId = recordId(doctor);
+            return [
+              <Entity key="name" name={doctorName(doctor)} note={doctor.room || doctor.officeRoom || "Room pending"} photoUrl={profileImageFor(doctor, "doctor")} />,
+              doctor.specialty || "-",
+              doctor.department || "-",
+              <span key="contact">{doctor.phone || "-"}<br /><span style={{ color: "var(--faint)" }}>{doctor.email || ""}</span></span>,
+              doctor.assignedPatients ?? 0,
+              statusBadge(doctor.status || "Available"),
+              <div className="row-actions" key="actions">
+                <button className="btn small" type="button" onClick={() => navigate("doctor-detail", { id: doctorId })}>View</button>
+                {canEdit ? <button className="btn small" type="button" onClick={() => navigate("doctor-form", { id: doctorId })}>Edit</button> : null}
+                {canEdit ? <button className="btn small danger" type="button" disabled={deletingKey === `doctors:${doctorId}`} onClick={() => removeRecord("doctors", doctor)}>{deletingKey === `doctors:${doctorId}` ? "Deleting..." : "Delete"}</button> : null}
+              </div>,
+            ];
+          }}
         />
       </div>
     </>
@@ -718,12 +754,12 @@ function DoctorsPage({ config, data, navigate, removeRecord, profile, deletingKe
 function DoctorFormPage({ config, data, params, profile, navigate, saveRecord }) {
   const id = params.get("id") || "";
   const clinicId = profile.clinicId || defaultClinicId;
-  const [doctor, setDoctor] = useState(data.doctors.find((item) => item.id === id) || {});
+  const [doctor, setDoctor] = useState(data.doctors.find((item) => recordId(item) === id) || {});
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let alive = true;
-    readOne(clinicId, "doctors", id, data.doctors.find((item) => item.id === id) || {}).then((record) => {
+    readOne(clinicId, "doctors", id, data.doctors.find((item) => recordId(item) === id) || {}).then((record) => {
       if (alive) setDoctor(record);
     });
     return () => { alive = false; };
@@ -736,13 +772,13 @@ function DoctorFormPage({ config, data, params, profile, navigate, saveRecord })
       const form = new FormData(event.currentTarget);
       const photoFile = form.get("photoFile");
       const payload = Object.fromEntries(form.entries());
-      const recordId = payload.id || id || doc(collection(db, "clinics", clinicId, "doctors")).id;
+      const targetId = id || payload.id || push(ref(rtdb, primaryCollectionPath("doctors"))).key;
       delete payload.id;
       delete payload.photoFile;
       payload.gender = normalizeGender(payload.gender);
 
       if (photoFile instanceof File && photoFile.size > 0) {
-        Object.assign(payload, await uploadProfilePhoto({ clinicId, collectionName: "doctors", recordId, file: photoFile }));
+        Object.assign(payload, await uploadProfilePhoto({ clinicId, collectionName: "doctors", recordId: targetId, file: photoFile }));
       } else if (!doctor.photoUrl || isDefaultProfileImage(doctor.photoUrl)) {
         payload.photoUrl = defaultProfileImage("doctor", payload.gender);
       } else {
@@ -750,7 +786,7 @@ function DoctorFormPage({ config, data, params, profile, navigate, saveRecord })
         if (doctor.photoPath) payload.photoPath = doctor.photoPath;
       }
 
-      await saveRecord("doctors", payload, recordId);
+      await saveRecord("doctors", payload, targetId, doctor);
       navigate("doctors");
     } catch (error) {
       console.error("Doctor save failed", error);
@@ -796,12 +832,13 @@ function DoctorFormPage({ config, data, params, profile, navigate, saveRecord })
 
 function DoctorDetailPage({ config, data, params, navigate, profile }) {
   const id = params.get("id") || data.doctors[0]?.id;
-  const doctor = data.doctors.find((item) => item.id === id) || data.doctors[0] || {};
-  const patients = data.patients.filter((patient) => patient.assignedDoctorId === doctor.id || patient.assignedDoctorName === doctorName(doctor));
+  const doctor = data.doctors.find((item) => recordId(item) === id) || data.doctors[0] || {};
+  const doctorId = recordId(doctor);
+  const patients = data.patients.filter((patient) => patient.assignedDoctorId === doctorId || patient.assignedDoctorName === doctorName(doctor));
 
   return (
     <>
-      <PageHeader config={config}>{profile.role === "administrator" ? <button className="btn primary" type="button" onClick={() => navigate("doctor-form", { id: doctor.id })}>Edit Doctor</button> : null}</PageHeader>
+      <PageHeader config={config}>{profile.role === "administrator" ? <button className="btn primary" type="button" onClick={() => navigate("doctor-form", { id: doctorId })}>Edit Doctor</button> : null}</PageHeader>
       <div className="panel">
         <div className="profile-header">
           <div className="profile-main"><span className="avatar large with-photo"><img src={profileImageFor(doctor, "doctor")} alt="" /></span><div><h2>{doctorName(doctor)}</h2><p>{doctor.specialty || "-"} | {doctor.department || "-"}</p></div></div>
@@ -832,20 +869,24 @@ function PatientsPage({ config, data, navigate, removeRecord, profile, deletingK
           columns={["Patient ID", "Name", "Age", "Gender", "Assigned Doctor", "Last Diagnosis", "Status", "Actions"]}
           rows={patients}
           empty="No patients found."
-          renderRow={(patient) => [
-            patient.patientId || patient.id,
-            <Entity key="name" name={patientName(patient)} note={patient.phone || ""} photoUrl={profileImageFor(patient, "patient")} />,
-            patient.age || ageFromDob(patient.dateOfBirth) || "-",
-            patient.gender || "-",
-            patient.assignedDoctorName || "-",
-            patient.lastDiagnosis || "-",
-            statusBadge(patient.status || "Stable"),
-            <div className="row-actions" key="actions">
-              <button className="btn small" type="button" onClick={() => navigate("patient-profile", { id: patient.id })}>View</button>
-              {canEdit ? <button className="btn small" type="button" onClick={() => navigate("patient-form", { id: patient.id })}>Edit</button> : null}
-              {canEdit ? <button className="btn small danger" type="button" disabled={deletingKey === `patients:${patient.id}`} onClick={() => removeRecord("patients", patient.id)}>{deletingKey === `patients:${patient.id}` ? "Deleting..." : "Delete"}</button> : null}
-            </div>,
-          ]}
+          renderRow={(patient) => {
+            const patientDocId = recordId(patient);
+            const canDelete = profile.role === "administrator";
+            return [
+              patient.patientId || patientDocId,
+              <Entity key="name" name={patientName(patient)} note={patient.phone || ""} photoUrl={profileImageFor(patient, "patient")} />,
+              patient.age || ageFromDob(patient.dateOfBirth) || "-",
+              patient.gender || "-",
+              patient.assignedDoctorName || "-",
+              patient.lastDiagnosis || "-",
+              statusBadge(patient.status || "Stable"),
+              <div className="row-actions" key="actions">
+                <button className="btn small" type="button" onClick={() => navigate("patient-profile", { id: patientDocId })}>View</button>
+                {canEdit ? <button className="btn small" type="button" onClick={() => navigate("patient-form", { id: patientDocId })}>Edit</button> : null}
+                {canDelete ? <button className="btn small danger" type="button" disabled={deletingKey === `patients:${patientDocId}`} onClick={() => removeRecord("patients", patient)}>{deletingKey === `patients:${patientDocId}` ? "Deleting..." : "Delete"}</button> : null}
+              </div>,
+            ];
+          }}
         />
       </div>
     </>
@@ -855,12 +896,12 @@ function PatientsPage({ config, data, navigate, removeRecord, profile, deletingK
 function PatientFormPage({ config, data, params, profile, navigate, saveRecord }) {
   const id = params.get("id") || "";
   const clinicId = profile.clinicId || defaultClinicId;
-  const [patient, setPatient] = useState(data.patients.find((item) => item.id === id) || {});
+  const [patient, setPatient] = useState(data.patients.find((item) => recordId(item) === id) || {});
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let alive = true;
-    readOne(clinicId, "patients", id, data.patients.find((item) => item.id === id) || {}).then((record) => {
+    readOne(clinicId, "patients", id, data.patients.find((item) => recordId(item) === id) || {}).then((record) => {
       if (alive) setPatient(record);
     });
     return () => { alive = false; };
@@ -873,16 +914,16 @@ function PatientFormPage({ config, data, params, profile, navigate, saveRecord }
       const form = new FormData(event.currentTarget);
       const photoFile = form.get("photoFile");
       const payload = Object.fromEntries(form.entries());
-      const recordId = payload.id || id || doc(collection(db, "clinics", clinicId, "patients")).id;
-      const doctor = data.doctors.find((item) => item.id === payload.assignedDoctorId);
+      const targetId = id || payload.id || push(ref(rtdb, primaryCollectionPath("patients"))).key;
+      const doctor = data.doctors.find((item) => recordId(item) === payload.assignedDoctorId);
       delete payload.id;
       delete payload.photoFile;
       payload.gender = normalizeGender(payload.gender);
       payload.assignedDoctorName = doctor ? doctorName(doctor) : patient.assignedDoctorName || "";
-      payload.patientId = patient.patientId || payload.patientId || recordId || "";
+      payload.patientId = patient.patientId || payload.patientId || targetId || "";
 
       if (photoFile instanceof File && photoFile.size > 0) {
-        Object.assign(payload, await uploadProfilePhoto({ clinicId, collectionName: "patients", recordId, file: photoFile }));
+        Object.assign(payload, await uploadProfilePhoto({ clinicId, collectionName: "patients", recordId: targetId, file: photoFile }));
       } else if (!patient.photoUrl || isDefaultProfileImage(patient.photoUrl)) {
         payload.photoUrl = defaultProfileImage("patient", payload.gender);
       } else {
@@ -890,7 +931,7 @@ function PatientFormPage({ config, data, params, profile, navigate, saveRecord }
         if (patient.photoPath) payload.photoPath = patient.photoPath;
       }
 
-      await saveRecord("patients", payload, recordId);
+      await saveRecord("patients", payload, targetId, patient);
       navigate("patients");
     } catch (error) {
       console.error("Patient save failed", error);
@@ -924,7 +965,10 @@ function PatientFormPage({ config, data, params, profile, navigate, saveRecord }
               <label>Assigned Doctor</label>
               <select name="assignedDoctorId" defaultValue={patient.assignedDoctorId || ""}>
                 <option value="">Select doctor</option>
-                {data.doctors.map((doctor) => <option value={doctor.id} key={doctor.id}>{doctorName(doctor)}</option>)}
+                {data.doctors.map((doctor) => {
+                  const doctorDocId = recordId(doctor);
+                  return <option value={doctorDocId} key={doctorDocId}>{doctorName(doctor)}</option>;
+                })}
               </select>
             </div>
             <Field label="Department" name="department" defaultValue={patient.department} />
@@ -943,15 +987,16 @@ function PatientFormPage({ config, data, params, profile, navigate, saveRecord }
 
 function PatientProfilePage({ config, data, params, navigate, profile }) {
   const id = params.get("id") || data.patients[0]?.id;
-  const patient = data.patients.find((item) => item.id === id) || data.patients[0] || {};
-  const doctor = data.doctors.find((item) => item.id === patient.assignedDoctorId || doctorName(item) === patient.assignedDoctorName) || {};
+  const patient = data.patients.find((item) => recordId(item) === id) || data.patients[0] || {};
+  const patientDocId = recordId(patient);
+  const doctor = data.doctors.find((item) => recordId(item) === patient.assignedDoctorId || doctorName(item) === patient.assignedDoctorName) || {};
 
   return (
     <>
-      <PageHeader config={config}>{["administrator", "receptionist"].includes(profile.role) ? <button className="btn primary" type="button" onClick={() => navigate("patient-form", { id: patient.id })}>Edit Patient</button> : null}</PageHeader>
+      <PageHeader config={config}>{["administrator", "receptionist"].includes(profile.role) ? <button className="btn primary" type="button" onClick={() => navigate("patient-form", { id: patientDocId })}>Edit Patient</button> : null}</PageHeader>
       <div className="panel">
         <div className="profile-header">
-          <div className="profile-main"><span className="avatar large with-photo"><img src={profileImageFor(patient, "patient")} alt="" /></span><div><h2>{patientName(patient)}</h2><p>{patient.patientId || patient.id} | {patient.age || ageFromDob(patient.dateOfBirth) || "-"} years | {patient.gender || "-"}</p></div></div>
+          <div className="profile-main"><span className="avatar large with-photo"><img src={profileImageFor(patient, "patient")} alt="" /></span><div><h2>{patientName(patient)}</h2><p>{patient.patientId || patientDocId} | {patient.age || ageFromDob(patient.dateOfBirth) || "-"} years | {patient.gender || "-"}</p></div></div>
           {statusBadge(patient.status || "Stable")}
         </div>
       </div>

@@ -4,7 +4,7 @@ const {HttpsError} = require("firebase-functions/v2/https");
 const {requireAdministrator, requireSignedIn} = require("../middleware/auth");
 const {
   DEFAULT_CLINIC_ID,
-  FieldValue,
+  RtdServerValue,
   findRegistration,
   markRegistrationLogin,
   mirrorClaims,
@@ -74,7 +74,7 @@ async function syncOwnAccessClaims(request) {
     departmentId: registration.value.departmentId || registration.value.department || "",
     clinicId,
     registrationPath: registration.path,
-    lastLoginAt: FieldValue.serverTimestamp(),
+    lastLoginAt: RtdServerValue.TIMESTAMP,
   });
 
   return {uid, role, staffType, clinicId, active: true, registrationPath: registration.path};

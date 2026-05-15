@@ -444,7 +444,11 @@ async function readDocs(name, fallback = [], options = {}) {
     if (options.orderBy) constraints.push(orderBy(...options.orderBy));
     if (options.limit) constraints.push(limit(options.limit));
     const snapshot = await getDocs(constraints.length ? query(base, ...constraints) : base);
-    return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+    return snapshot.docs.map((item) => {
+      const data = item.data() || {};
+      const legacyId = data.id && data.id !== item.id ? data.id : data.legacyId;
+      return { ...data, legacyId, id: item.id, docId: item.id };
+    });
   } catch (error) {
     console.warn(`Using sample ${name} data`, error);
     state.demoMode = true;
@@ -456,7 +460,10 @@ async function readDoc(name, id, fallback = null) {
   if (!id) return fallback;
   try {
     const snapshot = await getDoc(doc(db, "clinics", state.clinicId, name, id));
-    return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : fallback;
+    if (!snapshot.exists()) return fallback;
+    const data = snapshot.data() || {};
+    const legacyId = data.id && data.id !== snapshot.id ? data.id : data.legacyId;
+    return { ...data, legacyId, id: snapshot.id, docId: snapshot.id };
   } catch (error) {
     console.warn(`Using sample ${name} document`, error);
     state.demoMode = true;

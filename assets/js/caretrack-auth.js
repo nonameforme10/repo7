@@ -31,6 +31,9 @@ function clearError() {
 function registrationPaths(uid) {
   return [
     `registration/admin/${uid}`,
+    `registration/doctors/${uid}`,
+    `registration/receptionist/${uid}`,
+    `registration/nurses/${uid}`,
     `registration/clinicks/doctor/${uid}`,
     `registration/clinicks/nurse/${uid}`,
     `registration/clinicks/reception/${uid}`,

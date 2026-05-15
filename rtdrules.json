@@ -6,18 +6,77 @@
       "admin": {
         "$uid": {
           ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'administrator')",
-          ".write": "auth != null && auth.uid === $uid && data.exists() && newData.child('uid').val() === data.child('uid').val() && newData.child('email').val() === data.child('email').val() && newData.child('active').val() === data.child('active').val() && newData.child('role').val() === data.child('role').val() && newData.child('staffType').val() === data.child('staffType').val() && newData.child('clinicId').val() === data.child('clinicId').val()",
+          ".write": "auth != null && ((auth.token.role === 'administrator' && auth.token.active === true) || (auth.uid === $uid && data.exists() && newData.child('uid').val() === data.child('uid').val() && newData.child('email').val() === data.child('email').val() && newData.child('active').val() === data.child('active').val() && newData.child('role').val() === data.child('role').val() && newData.child('staffType').val() === data.child('staffType').val() && newData.child('clinicId').val() === data.child('clinicId').val()))",
           ".validate": "newData.hasChildren(['uid', 'email', 'active', 'role', 'staffType', 'clinicId'])"
+        }
+      },
+      "doctors": {
+        ".read": "auth != null && auth.token.active === true",
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'administrator')",
+          ".write": "auth != null && ((auth.token.role === 'administrator' && auth.token.active === true) || (auth.uid === $uid && data.exists() && newData.child('uid').val() === data.child('uid').val() && newData.child('email').val() === data.child('email').val() && newData.child('active').val() === data.child('active').val() && newData.child('role').val() === data.child('role').val() && newData.child('staffType').val() === data.child('staffType').val() && newData.child('clinicId').val() === data.child('clinicId').val()))",
+          ".validate": "newData.hasChildren(['uid', 'active', 'role', 'staffType', 'clinicId'])"
+        }
+      },
+      "receptionist": {
+        ".read": "auth != null && auth.token.active === true",
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'administrator')",
+          ".write": "auth != null && ((auth.token.role === 'administrator' && auth.token.active === true) || (auth.uid === $uid && data.exists() && newData.child('uid').val() === data.child('uid').val() && newData.child('email').val() === data.child('email').val() && newData.child('active').val() === data.child('active').val() && newData.child('role').val() === data.child('role').val() && newData.child('staffType').val() === data.child('staffType').val() && newData.child('clinicId').val() === data.child('clinicId').val()))",
+          ".validate": "newData.hasChildren(['uid', 'active', 'role', 'staffType', 'clinicId'])"
+        }
+      },
+      "nurses": {
+        ".read": "auth != null && auth.token.active === true",
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'administrator')",
+          ".write": "auth != null && ((auth.token.role === 'administrator' && auth.token.active === true) || (auth.uid === $uid && data.exists() && newData.child('uid').val() === data.child('uid').val() && newData.child('email').val() === data.child('email').val() && newData.child('active').val() === data.child('active').val() && newData.child('role').val() === data.child('role').val() && newData.child('staffType').val() === data.child('staffType').val() && newData.child('clinicId').val() === data.child('clinicId').val()))"
         }
       },
       "clinicks": {
         "$staffType": {
+          ".read": "auth != null && auth.token.active === true",
           "$uid": {
             ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'administrator')",
-            ".write": "auth != null && auth.uid === $uid && data.exists() && newData.child('uid').val() === data.child('uid').val() && newData.child('email').val() === data.child('email').val() && newData.child('active').val() === data.child('active').val() && newData.child('role').val() === data.child('role').val() && newData.child('staffType').val() === data.child('staffType').val() && newData.child('clinicId').val() === data.child('clinicId').val()",
-            ".validate": "newData.hasChildren(['uid', 'email', 'active', 'role', 'staffType', 'clinicId'])"
+            ".write": "auth != null && ((auth.token.role === 'administrator' && auth.token.active === true) || (auth.uid === $uid && data.exists() && newData.child('uid').val() === data.child('uid').val() && newData.child('email').val() === data.child('email').val() && newData.child('active').val() === data.child('active').val() && newData.child('role').val() === data.child('role').val() && newData.child('staffType').val() === data.child('staffType').val() && newData.child('clinicId').val() === data.child('clinicId').val()))"
           }
         }
+      }
+    },
+    "patients": {
+      ".read": "auth != null && auth.token.active === true",
+      "$patientId": {
+        ".write": "auth != null && auth.token.active === true && (auth.token.role === 'administrator' || auth.token.role === 'receptionist')"
+      }
+    },
+    "diagnoses": {
+      ".read": "auth != null && auth.token.active === true",
+      "$diagnosisId": {
+        ".write": "auth != null && auth.token.active === true && (auth.token.role === 'administrator' || auth.token.role === 'clinician')"
+      }
+    },
+    "schedules": {
+      ".read": "auth != null && auth.token.active === true",
+      "$scheduleId": {
+        ".write": "auth != null && auth.token.active === true && (auth.token.role === 'administrator' || auth.token.role === 'clinician')"
+      }
+    },
+    "reports": {
+      ".read": "auth != null && auth.token.active === true",
+      "$reportId": {
+        ".write": "auth != null && auth.token.active === true && (auth.token.role === 'administrator' || auth.token.role === 'clinician')"
+      }
+    },
+    "settings": {
+      ".read": "auth != null && auth.token.active === true",
+      "$settingId": {
+        ".write": "auth != null && auth.token.role === 'administrator' && auth.token.active === true"
+      }
+    },
+    "staffProfiles": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'administrator')",
+        ".write": "auth != null && auth.uid === $uid"
       }
     },
     "access": {
