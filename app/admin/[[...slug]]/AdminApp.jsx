@@ -60,6 +60,7 @@ const pageInfo = {
   "patient-form": { nav: "patients", title: "Patient", subtitle: "Register or update patient information and care assignment.", roles: ["administrator", "clinician", "receptionist"] },
   "patient-profile": { nav: "patients", title: "Patient Profile", subtitle: "Full medical record overview and linked diagnosis history.", roles: ["administrator", "clinician", "receptionist"] },
   diagnoses: { nav: "diagnoses", title: "Diagnoses", subtitle: "Manage patient disease and diagnosis records.", roles: ["administrator", "clinician", "receptionist"] },
+  "diagnosis-form": { nav: "diagnoses", title: "Diagnosis", subtitle: "Record clinical findings, disease diagnosis, and patient status.", roles: ["administrator", "clinician"] },
   reports: { nav: "reports", title: "Reports", subtitle: "Generate and review patient diagnosis reports.", roles: ["administrator", "clinician", "receptionist"] },
   schedules: { nav: "schedules", title: "Schedules", subtitle: "View doctor availability and working hours.", roles: ["administrator", "clinician", "receptionist"] },
   users: { nav: "users", title: "User Management", subtitle: "Manage clinic staff accounts and access.", roles: ["administrator"] },
@@ -130,6 +131,7 @@ function pageUrl(page, params = {}) {
     "patient-form": "/admin/patient-form",
     "patient-profile": "/admin/patient-profile",
     diagnoses: "/admin/diagnoses",
+    "diagnosis-form": "/admin/diagnosis-form",
     reports: "/admin/reports",
     schedules: "/admin/schedules",
     users: "/admin/users",
@@ -292,6 +294,12 @@ function findAssignedDoctor(doctors = [], patient = {}) {
   return doctors.find((doctor) => recordId(doctor) === assignedId || doctorName(doctor) === assignedName) || null;
 }
 
+function canDiagnosePatient(patient = {}, profile = {}) {
+  if (profile.role === "administrator") return true;
+  if (profile.role !== "clinician") return false;
+  return patient.assignedDoctorId === profile.uid || patient.assignedDoctorName === profile.displayName;
+}
+
 const scheduleWeekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const scheduleDayNames = {
   mon: "Monday",
@@ -358,6 +366,55 @@ function assignedPatientSummary(patients = []) {
   return patients.length > 2 ? `${names} +${patients.length - 2}` : names;
 }
 
+const diseaseSuggestions = [
+  "Tuberculosis",
+  "Hantavirus pulmonary syndrome",
+  "Influenza",
+  "Pneumonia",
+  "Bronchitis",
+  "Otitis media",
+  "Sinusitis",
+  "Allergic rhinitis",
+  "Tonsillitis",
+  "Pharyngitis",
+  "Hypertension",
+  "Migraine",
+];
+
+const defaultClinicalChecks = [
+  "Fever",
+  "Pain",
+  "Cough",
+  "Shortness of breath",
+  "Fatigue",
+  "Weight loss",
+];
+
+const specialtyClinicalChecks = [
+  {
+    terms: ["ent", "lor", "otolaryng", "ear", "nose", "throat"],
+    checks: ["Ear pain", "Hearing loss", "Tinnitus", "Nasal obstruction", "Nasal discharge", "Sinus tenderness", "Sore throat", "Tonsil swelling"],
+  },
+  {
+    terms: ["pulmo", "respir", "chest", "lung"],
+    checks: ["Persistent cough", "Hemoptysis", "Wheezing", "Chest pain", "Shortness of breath", "Night sweats", "Low oxygen saturation", "Abnormal breath sounds"],
+  },
+  {
+    terms: ["cardio", "heart"],
+    checks: ["Chest pain", "Palpitations", "High blood pressure", "Shortness of breath", "Leg swelling", "Irregular rhythm"],
+  },
+];
+
+function clinicalChecksForDoctor(doctor = {}) {
+  const specialty = `${doctor.specialty || ""} ${doctor.department || ""}`.toLowerCase();
+  const matched = specialtyClinicalChecks.find((item) => item.terms.some((term) => specialty.includes(term)));
+  return matched?.checks || defaultClinicalChecks;
+}
+
+function todayInputValue() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function buildScheduleRows(schedules = [], doctors = [], patients = []) {
   const rows = [];
   const explicitDoctorIds = new Set();
@@ -405,6 +462,38 @@ function buildScheduleRows(schedules = [], doctors = [], patients = []) {
   });
 
   return rows;
+}
+
+function notificationPath(notification = {}) {
+  return notification._path || `notifications/${recordId(notification)}`;
+}
+
+function notificationForProfile(notification = {}, profile = {}) {
+  return notification.recipientUid === profile.uid && (!notification.clinicId || notification.clinicId === (profile.clinicId || defaultClinicId));
+}
+
+async function createAssignmentNotification({ clinicId, doctor, patientRecordId, patient, assignedBy }) {
+  const doctorId = recordId(doctor) || patient.assignedDoctorId;
+  if (!doctorId || !patientRecordId) return;
+
+  const notificationId = `${patientRecordId}_${doctorId}_assignment`;
+  await set(ref(rtdb, `notifications/${notificationId}`), {
+    id: notificationId,
+    type: "patient-assignment",
+    title: "New consultation assigned",
+    message: `${patientName(patient)} is assigned to you for diagnosis.`,
+    recipientUid: doctorId,
+    recipientName: doctorName(doctor),
+    patientRecordId,
+    patientId: patient.patientId || patientRecordId,
+    patientName: patientName(patient),
+    department: patient.department || doctor.department || "",
+    read: false,
+    clinicId,
+    createdAt: serverTimestamp(),
+    createdBy: assignedBy.uid,
+    createdByName: assignedBy.displayName || assignedBy.email || assignedBy.uid,
+  });
 }
 
 function collectionPaths(name) {
@@ -571,6 +660,122 @@ function useAdminSession() {
   return session;
 }
 
+function useProfileNotifications(profile = {}) {
+  const [notifications, setNotifications] = useState([]);
+
+  useEffect(() => {
+    if (!profile.uid) return undefined;
+
+    let alive = true;
+    const clinicId = profile.clinicId || defaultClinicId;
+
+    async function load() {
+      const [records, patients] = await Promise.all([
+        readCollection(clinicId, "notifications"),
+        readCollection(clinicId, "patients"),
+      ]);
+      if (!alive) return;
+      const visibleNotifications = records.filter((item) => notificationForProfile(item, profile));
+      const notifiedPatients = new Set(visibleNotifications.map((item) => item.patientRecordId).filter(Boolean));
+      const assignedPatientNotifications = profile.role === "clinician"
+        ? patients
+          .filter((patient) => canDiagnosePatient(patient, profile))
+          .filter((patient) => !notifiedPatients.has(recordId(patient)))
+          .map((patient) => ({
+            id: `${recordId(patient)}_${profile.uid}_assignment`,
+            type: "patient-assignment",
+            title: "Patient assigned",
+            message: `${patientName(patient)} is assigned to you for diagnosis.`,
+            recipientUid: profile.uid,
+            recipientName: profile.displayName || profile.email || profile.uid,
+            patientRecordId: recordId(patient),
+            patientId: patient.patientId || recordId(patient),
+            patientName: patientName(patient),
+            department: patient.department || "",
+            read: false,
+            clinicId,
+            createdAt: patient.updatedAt || patient.createdAt || 0,
+            _derived: true,
+          }))
+        : [];
+      setNotifications(
+        [...visibleNotifications, ...assignedPatientNotifications]
+          .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))
+          .slice(0, 8)
+      );
+    }
+
+    load();
+    const timer = window.setInterval(load, 20000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, [profile.clinicId, profile.uid]);
+
+  return [notifications, setNotifications];
+}
+
+function NotificationBell({ profile, navigate, notify }) {
+  const [open, setOpen] = useState(false);
+  const [notifications, setNotifications] = useProfileNotifications(profile);
+  const unread = notifications.filter((item) => item.read !== true).length;
+
+  async function markRead(item) {
+    if (!recordId(item)) return;
+    setNotifications((current) => current.map((notification) => (
+      recordId(notification) === recordId(item) ? { ...notification, read: true } : notification
+    )));
+    try {
+      if (item._derived) {
+        const { _derived, ...record } = item;
+        await set(ref(rtdb, notificationPath(record)), { ...record, read: true, readAt: serverTimestamp() });
+        return;
+      }
+      await update(ref(rtdb, notificationPath(item)), { read: true, readAt: serverTimestamp() });
+    } catch (error) {
+      console.warn("Could not mark notification read", error);
+    }
+  }
+
+  async function openPatient(item, destination = "patient-profile") {
+    await markRead(item);
+    setOpen(false);
+    if (item.patientRecordId) {
+      navigate(destination, { id: item.patientRecordId, patientId: item.patientRecordId });
+      return;
+    }
+    notify("This notification is missing a patient link.");
+  }
+
+  return (
+    <div className="notification-wrap">
+      <button className="icon-button" type="button" title="Notifications" aria-label="Notifications" onClick={() => setOpen((value) => !value)}>
+        {icons.bell}
+        {unread ? <span className="notification-count">{unread}</span> : null}
+      </button>
+      {open ? (
+        <div className="notification-panel">
+          <div className="notification-head">
+            <strong>Notifications</strong>
+            <span>{unread} unread</span>
+          </div>
+          {notifications.length ? notifications.map((item) => (
+            <div className={`notification-item ${item.read === true ? "" : "unread"}`} key={recordId(item)}>
+              <button type="button" onClick={() => openPatient(item)} className="notification-main">
+                <strong>{item.title || "Patient assignment"}</strong>
+                <span>{item.message || `${item.patientName || "Patient"} is assigned to you.`}</span>
+                <small>{item.patientId || item.department || ""}</small>
+              </button>
+              <button className="btn small primary" type="button" onClick={() => openPatient(item, "diagnosis-form")}>Diagnose</button>
+            </div>
+          )) : <div className="notification-empty">No patient assignments.</div>}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function AdminApp() {
   const session = useAdminSession();
   const [route, setRoute] = useState(routeStateFromLocation);
@@ -669,7 +874,7 @@ export default function AdminApp() {
             <input type="search" placeholder="Search patients, doctors, records..." />
           </div>
           <div className="topbar-actions">
-            <button className="icon-button" type="button" title="Notifications">{icons.bell}<span className="notification-dot" /></button>
+            <NotificationBell profile={profile} navigate={navigate} notify={setToast} />
             <div className="topbar-user">
               <span className="avatar">{initials(profile.displayName || profile.email)}</span>
               <div style={{ minWidth: 0 }}>
@@ -790,6 +995,7 @@ function AdminPage({ page, config, params, profile, navigate, notify }) {
   if (page === "patient-form") return <PatientFormPage config={config} {...common} />;
   if (page === "patient-profile") return <PatientProfilePage config={config} {...common} />;
   if (page === "diagnoses") return <DiagnosesPage config={config} {...common} />;
+  if (page === "diagnosis-form") return <DiagnosisFormPage config={config} {...common} />;
   if (page === "reports") return <SimpleRecordsPage config={config} collection="diagnoses" title="Diagnosis Reports" rows={data.diagnoses} columns={["patientName", "description", "severity", "diagnosisDate"]} />;
   if (page === "schedules") return <SchedulesPage config={config} data={data} />;
   if (page === "users") return <StaffUsersPage config={config} users={data.users} profile={profile} notify={notify} />;
@@ -1082,6 +1288,7 @@ function PatientsPage({ config, data, navigate, removeRecord, profile, deletingK
               statusBadge(patient.status || "Stable"),
               <div className="row-actions" key="actions">
                 <button className="btn small" type="button" onClick={() => navigate("patient-profile", { id: patientDocId })}>View</button>
+                {canDiagnosePatient(patient, profile) ? <button className="btn small primary" type="button" onClick={() => navigate("diagnosis-form", { patientId: patientDocId })}>Diagnose</button> : null}
                 {canEdit ? <button className="btn small" type="button" onClick={() => navigate("patient-form", { id: patientDocId })}>Edit</button> : null}
                 {canDelete ? <button className="btn small danger" type="button" disabled={deletingKey === `patients:${patientDocId}`} onClick={() => removeRecord("patients", patient)}>{deletingKey === `patients:${patientDocId}` ? "Deleting..." : "Delete"}</button> : null}
               </div>,
@@ -1127,6 +1334,7 @@ function PatientFormPage({ config, data, params, profile, navigate, saveRecord }
       const payload = Object.fromEntries(form.entries());
       const targetId = id || payload.id || draftPatient.id || push(ref(rtdb, primaryCollectionPath("patients"))).key;
       const doctor = data.doctors.find((item) => recordId(item) === selectedDoctorId);
+      const previousDoctorId = patient.assignedDoctorId || "";
       delete payload.id;
       delete payload.photoFile;
       payload.gender = normalizeGender(payload.gender);
@@ -1145,6 +1353,15 @@ function PatientFormPage({ config, data, params, profile, navigate, saveRecord }
       }
 
       await saveRecord("patients", payload, targetId, patient);
+      if (selectedDoctorId && selectedDoctorId !== previousDoctorId) {
+        await createAssignmentNotification({
+          clinicId,
+          doctor,
+          patientRecordId: targetId,
+          patient: { ...patient, ...payload, id: targetId },
+          assignedBy: profile,
+        });
+      }
       navigate("patients");
     } catch (error) {
       console.error("Patient save failed", error);
@@ -1210,7 +1427,10 @@ function PatientProfilePage({ config, data, params, navigate, profile }) {
 
   return (
     <>
-      <PageHeader config={config}>{["administrator", "clinician", "receptionist"].includes(profile.role) ? <button className="btn primary" type="button" onClick={() => navigate("patient-form", { id: patientDocId })}>Edit Patient</button> : null}</PageHeader>
+      <PageHeader config={config}>
+        {canDiagnosePatient(patient, profile) ? <button className="btn primary" type="button" onClick={() => navigate("diagnosis-form", { patientId: patientDocId })}>Add Diagnosis</button> : null}
+        {["administrator", "clinician", "receptionist"].includes(profile.role) ? <button className="btn" type="button" onClick={() => navigate("patient-form", { id: patientDocId })}>Edit Patient</button> : null}
+      </PageHeader>
       <div className="panel">
         <div className="profile-header">
           <div className="profile-main"><span className="avatar large with-photo"><img src={profileImageFor(patient, "patient")} alt="" /></span><div><h2>{patientName(patient)}</h2><p>{patient.patientId || patientDocId} | {patient.age || ageFromDob(patient.dateOfBirth) || "-"} years | {patient.gender || "-"}</p></div></div>
@@ -1225,11 +1445,12 @@ function PatientProfilePage({ config, data, params, navigate, profile }) {
   );
 }
 
-function DiagnosesPage({ config, data, removeRecord, profile, deletingKey }) {
+function DiagnosesPage({ config, data, navigate, removeRecord, profile, deletingKey }) {
   const canDelete = profile.role === "administrator";
+  const canAdd = ["administrator", "clinician"].includes(profile.role);
   return (
     <>
-      <PageHeader config={config} />
+      <PageHeader config={config}>{canAdd ? <button className="btn primary" type="button" onClick={() => navigate("diagnosis-form")}>{icons.plus} Add Diagnosis</button> : null}</PageHeader>
       <div className="panel">
         <ResponsiveTable
           columns={["ICD", "Patient", "Diagnosis", "Clinician", "Severity", "Date", "Actions"]}
@@ -1245,6 +1466,150 @@ function DiagnosesPage({ config, data, removeRecord, profile, deletingKey }) {
             canDelete ? <button className="btn small danger" type="button" disabled={deletingKey === `diagnoses:${item.id}`} onClick={() => removeRecord("diagnoses", item.id)}>{deletingKey === `diagnoses:${item.id}` ? "Deleting..." : "Delete"}</button> : "-",
           ]}
         />
+      </div>
+    </>
+  );
+}
+
+function DiagnosisFormPage({ config, data, params, profile, navigate, saveRecord, notify }) {
+  const clinicId = profile.clinicId || defaultClinicId;
+  const patientIdParam = params.get("patientId") || params.get("id") || "";
+  const [selectedPatientId, setSelectedPatientId] = useState(patientIdParam);
+  const [busy, setBusy] = useState(false);
+
+  const allowedPatients = useMemo(() => {
+    if (profile.role === "administrator") return data.patients;
+    return data.patients.filter((patient) => canDiagnosePatient(patient, profile));
+  }, [data.patients, profile]);
+
+  useEffect(() => {
+    if (!selectedPatientId && allowedPatients[0]) {
+      setSelectedPatientId(recordId(allowedPatients[0]));
+    }
+  }, [allowedPatients, selectedPatientId]);
+
+  const patient = allowedPatients.find((item) => recordId(item) === selectedPatientId || item.patientId === selectedPatientId) || allowedPatients[0] || {};
+  const patientRecordId = recordId(patient);
+  const doctor = findAssignedDoctor(data.doctors, patient) || data.doctors.find((item) => recordId(item) === profile.uid) || {};
+  const clinicianName = recordId(doctor) ? doctorName(doctor) : profile.displayName || profile.email || "Clinician";
+  const checks = clinicalChecksForDoctor(doctor);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (!patientRecordId) {
+      notify("Select a patient before saving a diagnosis.");
+      return;
+    }
+    if (!canDiagnosePatient(patient, profile)) {
+      notify("Only the assigned doctor can diagnose this patient.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const form = event.currentTarget;
+      const formData = new FormData(form);
+      const payload = Object.fromEntries(formData.entries());
+      const clinicalFindings = formData.getAll("clinicalFindings").map((item) => String(item));
+      const doctorId = recordId(doctor) || profile.uid;
+
+      payload.patientId = patientRecordId;
+      payload.patientPublicId = patient.patientId || patientRecordId;
+      payload.patientName = patientName(patient);
+      payload.assignedDoctorId = doctorId;
+      payload.assignedDoctorName = clinicianName;
+      payload.department = doctor.department || patient.department || "";
+      payload.specialty = doctor.specialty || "";
+      payload.description = String(payload.description || "").trim();
+      payload.clinicalFindings = clinicalFindings;
+      payload.findingsText = clinicalFindings.join(", ");
+      payload.diagnosisDate = payload.diagnosisDate || todayInputValue();
+      payload.severity = payload.severity || "Medium";
+      payload.status = payload.status || "Monitoring";
+
+      await saveRecord("diagnoses", payload);
+
+      try {
+        await update(ref(rtdb, patient._path || `${primaryCollectionPath("patients")}/${patientRecordId}`), {
+          lastDiagnosis: payload.description,
+          status: payload.patientStatus || "Monitoring",
+          updatedAt: serverTimestamp(),
+          updatedBy: profile.uid,
+        });
+      } catch (error) {
+        console.warn("Could not update patient diagnosis summary", error);
+      }
+
+      notify("Diagnosis saved.");
+      navigate("patient-profile", { id: patientRecordId });
+    } catch (error) {
+      console.error("Diagnosis save failed", error);
+      alert(error.message || "Could not save diagnosis.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!allowedPatients.length) {
+    return (
+      <>
+        <PageHeader config={config} />
+        <div className="panel pad">
+          <h2 className="panel-title">No assigned patients</h2>
+          <p className="page-subtitle">A patient must be assigned to this doctor before a diagnosis can be recorded.</p>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <PageHeader config={config}><button className="btn" type="button" onClick={() => navigate("diagnoses")}>Cancel</button></PageHeader>
+      <div className="panel pad">
+        <form onSubmit={handleSubmit} key={patientRecordId || "diagnosis-form"}>
+          <datalist id="diagnosisSuggestions">
+            {diseaseSuggestions.map((item) => <option value={item} key={item} />)}
+          </datalist>
+          <FormSection title="Patient">
+            <div className="field">
+              <label>Select Patient</label>
+              <select name="selectedPatientId" value={patientRecordId} onChange={(event) => setSelectedPatientId(event.target.value)}>
+                {allowedPatients.map((item) => {
+                  const id = recordId(item);
+                  return <option value={id} key={id}>{patientName(item)} ({item.patientId || id})</option>;
+                })}
+              </select>
+            </div>
+            <Field label="Assigned Doctor" name="assignedDoctorName" value={clinicianName} readOnly />
+            <Field label="Specialty" name="specialtyDisplay" value={doctor.specialty || doctor.department || ""} readOnly />
+            <SelectField label="Patient Status" name="patientStatus" options={["Stable", "Monitoring", "Critical"]} defaultValue={patient.status || "Monitoring"} />
+          </FormSection>
+          <FormSection title="Diagnosis">
+            <Field label="Disease / Diagnosis" name="description" list="diagnosisSuggestions" required />
+            <Field label="ICD Code" name="icdCode" />
+            <SelectField label="Severity" name="severity" options={["Low", "Medium", "High", "Critical"]} defaultValue="Medium" />
+            <Field label="Diagnosis Date" name="diagnosisDate" type="date" defaultValue={todayInputValue()} required />
+            <SelectField label="Diagnosis Status" name="status" options={["Open", "Monitoring", "Resolved"]} defaultValue="Monitoring" />
+          </FormSection>
+          <FormSection title="Clinical Checks">
+            <div className="field full">
+              <label>Findings</label>
+              <div className="check-grid">
+                {checks.map((check) => (
+                  <label className="check-card" key={check}>
+                    <input type="checkbox" name="clinicalFindings" value={check} />
+                    <span>{check}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <TextArea label="Clinical Notes" name="clinicalNotes" defaultValue="" />
+          </FormSection>
+          <div className="form-actions">
+            <button className="btn" type="button" onClick={() => navigate("patient-profile", { id: patientRecordId })}>Cancel</button>
+            <button className="btn primary" type="submit" disabled={busy}>{busy ? "Saving..." : "Save Diagnosis"}</button>
+          </div>
+        </form>
       </div>
     </>
   );

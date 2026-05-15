@@ -61,6 +61,12 @@
         ".write": "auth != null && auth.token.active === true && (auth.token.role === 'administrator' || auth.token.role === 'clinician')"
       }
     },
+    "notifications": {
+      ".read": "auth != null && auth.token.active === true",
+      "$notificationId": {
+        ".write": "auth != null && auth.token.active === true && (auth.token.role === 'administrator' || auth.token.role === 'clinician' || auth.token.role === 'receptionist')"
+      }
+    },
     "reports": {
       ".read": "auth != null && auth.token.active === true",
       "$reportId": {
