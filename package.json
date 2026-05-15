@@ -4,6 +4,8 @@
     "build": "next build",
     "start": "node server.js",
     "serve": "node server.js --dev",
+    "vps:start": "pm2 startOrReload ecosystem.config.cjs --update-env",
+    "vps:logs": "pm2 logs caretrack",
     "test:e2e": "playwright test",
     "deploy:functions": "firebase deploy --only functions",
     "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes,database,storage",
