@@ -1,12 +1,13 @@
 "use strict";
 
-const CACHE_VERSION = "caretrack-app-v6";
-const HEALTH_PATH = "/__caretrack_health";
+const CACHE_VERSION = "caretrack-app-v8";
+const HEALTH_PATHS = new Set(["/__caretrack_health", "/_caretrack_health"]);
 const PRECACHE_ASSETS = [
   "/",
   "/index.html",
   "/auth",
   "/auth/index.html",
+  "/favicon.ico",
   "/admin",
   "/admin/doctors",
   "/admin/patients",
@@ -135,7 +136,7 @@ self.addEventListener("fetch", (event) => {
 
   if (request.method !== "GET") return;
 
-  if (sameOrigin && url.pathname === HEALTH_PATH) {
+  if (sameOrigin && HEALTH_PATHS.has(url.pathname)) {
     event.respondWith(handleHealthCheck());
     return;
   }

@@ -60,13 +60,13 @@ service cloud.firestore {
 
       match /patients/{patientId} {
         allow read: if isClinicStaff(clinic);
-        allow create: if isAdmin(clinic) || isReceptionist(clinic);
+        allow create: if isAdmin(clinic) || isClinician(clinic) || isReceptionist(clinic);
         allow update: if isAdmin(clinic)
-          || (isReceptionist(clinic) && changedOnly([
+          || ((isClinician(clinic) || isReceptionist(clinic)) && changedOnly([
             "firstName", "lastName", "dateOfBirth", "age", "gender",
-            "phone", "email", "address", "emergencyContactName",
+            "patientId", "phone", "email", "address", "emergencyContactName",
             "emergencyContactPhone", "assignedDoctorId", "assignedDoctorName",
-            "department", "registrationNotes", "status", "lastUpdated",
+            "department", "registrationNotes", "photoUrl", "photoPath", "status", "lastUpdated",
             "updatedAt", "updatedBy", "clinicId"
           ]));
         allow delete: if isAdmin(clinic);

@@ -310,7 +310,7 @@
 
       try {
         const health = await fetchHealthThroughServiceWorker();
-        if (health.viaServiceWorker || health.online === false) {
+        if (health.viaServiceWorker) {
           return commitStatus({
             online: health.online,
             viaServiceWorker: health.viaServiceWorker,
@@ -325,12 +325,22 @@
           healthStatus: health.status,
         });
       } catch (error) {
-        return commitStatus({
-          online: false,
-          viaServiceWorker: !!navigator.serviceWorker?.controller,
-          healthStatus: 0,
-          error: error.message,
-        });
+        try {
+          const directOnline = await fetchDirectFallback();
+          return commitStatus({
+            online: directOnline,
+            viaServiceWorker: false,
+            healthStatus: 0,
+            error: error.message,
+          });
+        } catch (fallbackError) {
+          return commitStatus({
+            online: false,
+            viaServiceWorker: !!navigator.serviceWorker?.controller,
+            healthStatus: 0,
+            error: fallbackError.message || error.message,
+          });
+        }
       }
     })().finally(() => {
       if (runId === checkSequence) {

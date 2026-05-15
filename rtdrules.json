@@ -46,7 +46,7 @@
     "patients": {
       ".read": "auth != null && auth.token.active === true",
       "$patientId": {
-        ".write": "auth != null && auth.token.active === true && (auth.token.role === 'administrator' || auth.token.role === 'receptionist')"
+        ".write": "auth != null && auth.token.active === true && (auth.token.role === 'administrator' || auth.token.role === 'clinician' || auth.token.role === 'receptionist')"
       }
     },
     "diagnoses": {

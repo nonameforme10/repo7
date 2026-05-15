@@ -56,9 +56,14 @@ nextApp.prepare().then(() => {
   server.use("/api", express.json({ limit: "1mb" }));
   server.use("/api", express.urlencoded({ extended: false, limit: "1mb" }));
 
-  server.get("/__caretrack_health", (_req, res) => {
+  server.get(["/__caretrack_health", "/_caretrack_health"], (_req, res) => {
     res.setHeader("Cache-Control", "no-store");
     res.json({ ok: true, app: "caretrack", via: "express" });
+  });
+
+  server.get("/favicon.ico", (_req, res) => {
+    res.setHeader("Cache-Control", "public, max-age=2592000");
+    res.type("png").sendFile(path.join(rootDir, "assets", "img", "logo.png"));
   });
 
   server.get("/api/health", (_req, res) => {

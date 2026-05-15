@@ -4,6 +4,10 @@ import "../assets/css/caretrack.css";
 export const metadata = {
   title: "CareTrack - Secure Medical Records Management",
   description: "CareTrack is a secure medical records management system for authorized clinic staff.",
+  icons: {
+    icon: "/assets/img/logo.png",
+    shortcut: "/assets/img/logo.png",
+  },
 };
 
 export const viewport = {

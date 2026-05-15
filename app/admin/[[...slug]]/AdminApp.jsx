@@ -18,6 +18,7 @@ import {
   signOut,
   storage,
   storageRef,
+  update,
   uploadBytes,
 } from "../../lib/firebase-client";
 
@@ -56,7 +57,7 @@ const pageInfo = {
   "doctor-form": { nav: "doctors", title: "Doctor", subtitle: "Create or update clinician profile, specialty, contact, and availability.", roles: ["administrator"] },
   "doctor-detail": { nav: "doctors", title: "Doctor Profile", subtitle: "Review doctor details, assigned patients, schedule, and activity.", roles: ["administrator", "clinician", "receptionist"] },
   patients: { nav: "patients", title: "Patients", subtitle: "View, register, and manage patient records.", roles: ["administrator", "clinician", "receptionist"] },
-  "patient-form": { nav: "patients", title: "Patient", subtitle: "Register or update patient information and care assignment.", roles: ["administrator", "receptionist"] },
+  "patient-form": { nav: "patients", title: "Patient", subtitle: "Register or update patient information and care assignment.", roles: ["administrator", "clinician", "receptionist"] },
   "patient-profile": { nav: "patients", title: "Patient Profile", subtitle: "Full medical record overview and linked diagnosis history.", roles: ["administrator", "clinician", "receptionist"] },
   diagnoses: { nav: "diagnoses", title: "Diagnoses", subtitle: "Manage patient disease and diagnosis records.", roles: ["administrator", "clinician", "receptionist"] },
   reports: { nav: "reports", title: "Reports", subtitle: "Generate and review patient diagnosis reports.", roles: ["administrator", "clinician", "receptionist"] },
@@ -919,7 +920,7 @@ function DoctorDetailPage({ config, data, params, navigate, profile }) {
 
 function PatientsPage({ config, data, navigate, removeRecord, profile, deletingKey }) {
   const [search, setSearch] = useState("");
-  const canEdit = ["administrator", "receptionist"].includes(profile.role);
+  const canEdit = ["administrator", "clinician", "receptionist"].includes(profile.role);
   const patients = useMemo(() => data.patients.filter((patient) => `${patient.patientId || patient.id} ${patientName(patient)} ${patient.phone || ""} ${patient.assignedDoctorName || ""}`.toLowerCase().includes(search.toLowerCase())), [data.patients, search]);
 
   return (
@@ -1057,7 +1058,7 @@ function PatientProfilePage({ config, data, params, navigate, profile }) {
 
   return (
     <>
-      <PageHeader config={config}>{["administrator", "receptionist"].includes(profile.role) ? <button className="btn primary" type="button" onClick={() => navigate("patient-form", { id: patientDocId })}>Edit Patient</button> : null}</PageHeader>
+      <PageHeader config={config}>{["administrator", "clinician", "receptionist"].includes(profile.role) ? <button className="btn primary" type="button" onClick={() => navigate("patient-form", { id: patientDocId })}>Edit Patient</button> : null}</PageHeader>
       <div className="panel">
         <div className="profile-header">
           <div className="profile-main"><span className="avatar large with-photo"><img src={profileImageFor(patient, "patient")} alt="" /></span><div><h2>{patientName(patient)}</h2><p>{patient.patientId || patientDocId} | {patient.age || ageFromDob(patient.dateOfBirth) || "-"} years | {patient.gender || "-"}</p></div></div>

@@ -87,7 +87,7 @@ const pages = {
   "doctor-form": { nav: "doctors", title: "Add Doctor", subtitle: "Create or update clinician profile, specialty, contact, and availability.", roles: ["administrator"], render: renderDoctorForm },
   "doctor-detail": { nav: "doctors", title: "Doctor Profile", subtitle: "Review doctor details, assigned patients, schedule, and activity.", roles: ["administrator", "clinician", "receptionist"], render: renderDoctorDetail },
   patients: { nav: "patients", title: "Patients", subtitle: "View, register, and manage patient records.", roles: ["administrator", "clinician", "receptionist"], render: renderPatients },
-  "patient-form": { nav: "patients", title: "Register New Patient", subtitle: "Register patient information and assign the right clinical care team.", roles: ["administrator", "receptionist"], render: renderPatientForm },
+  "patient-form": { nav: "patients", title: "Register New Patient", subtitle: "Register patient information and assign the right clinical care team.", roles: ["administrator", "clinician", "receptionist"], render: renderPatientForm },
   "patient-profile": { nav: "patients", title: "Patient Profile", subtitle: "Full medical record overview and linked diagnosis history.", roles: ["administrator", "clinician", "receptionist"], render: renderPatientProfile },
   diagnoses: { nav: "diagnoses", title: "Diagnoses", subtitle: "Manage patient disease and diagnosis records.", roles: ["administrator", "clinician", "receptionist"], render: renderDiagnoses },
   "diagnosis-form": { nav: "diagnoses", title: "Add Diagnosis Record", subtitle: "Create or update a diagnosis linked to a patient profile.", roles: ["administrator", "clinician"], render: renderDiagnosisForm },
@@ -599,7 +599,7 @@ async function renderDashboard(config) {
   const critical = patients.filter((patient) => String(patient.status || "").toLowerCase().includes("critical")).length;
   const actions = html`
     ${can(["administrator"]) ? `<a class="btn primary" href="${pageUrl("doctor-form")}">${icons.plus} Add Doctor</a>` : ""}
-    ${can(["administrator", "receptionist"]) ? `<a class="btn primary" href="${pageUrl("patient-form")}">${icons.plus} Register Patient</a>` : ""}
+    ${can(["administrator", "clinician", "receptionist"]) ? `<a class="btn primary" href="${pageUrl("patient-form")}">${icons.plus} Register Patient</a>` : ""}
     ${can(["administrator", "clinician"]) ? `<a class="btn" href="${pageUrl("diagnosis-form")}">${icons.activity} Add Diagnosis</a>` : ""}`;
 
   return html`
@@ -754,7 +754,7 @@ async function renderDoctorDetail(config) {
 
 async function renderPatients(config) {
   const patients = await readDocs("patients", samples.patients);
-  const actions = can(["administrator", "receptionist"]) ? `<a class="btn primary" href="${pageUrl("patient-form")}">${icons.plus} Register Patient</a>` : "";
+  const actions = can(["administrator", "clinician", "receptionist"]) ? `<a class="btn primary" href="${pageUrl("patient-form")}">${icons.plus} Register Patient</a>` : "";
   return html`
     ${pageHeader(config, actions)}
     <div class="toolbar">
@@ -782,7 +782,7 @@ function patientsTable(patients, includeActions = true) {
               <td>${escapeText(patient.lastDiagnosis || "-")}</td>
               <td>${escapeText(patient.lastUpdated || patient.lastUpdatedText || "Recently")}</td>
               <td>${statusBadge(patient.status || "Stable")}</td>
-              ${includeActions ? `<td><div class="row-actions"><a class="btn small" href="${pageUrl("patient-profile", { id: patient.id })}">View</a>${can(["administrator", "receptionist"]) ? `<a class="btn small" href="${pageUrl("patient-form", { id: patient.id })}">Edit</a><button class="btn small danger" data-delete-record="patients:${escapeText(patient.id)}">Delete</button>` : ""}</div></td>` : ""}
+              ${includeActions ? `<td><div class="row-actions"><a class="btn small" href="${pageUrl("patient-profile", { id: patient.id })}">View</a>${can(["administrator", "clinician", "receptionist"]) ? `<a class="btn small" href="${pageUrl("patient-form", { id: patient.id })}">Edit</a>` : ""}${can(["administrator"]) ? `<button class="btn small danger" data-delete-record="patients:${escapeText(patient.id)}">Delete</button>` : ""}</div></td>` : ""}
             </tr>`).join("")}
         </tbody>
       </table>
