@@ -32,6 +32,13 @@ const roleLabels = {
   receptionist: "Receptionist",
 };
 
+const staffTypeLabels = {
+  admin: "Administrator",
+  doctor: "Doctor",
+  nurse: "Nurse",
+  reception: "Reception",
+};
+
 const navItems = [
   { key: "dashboard", path: "/admin", label: "Dashboard", icon: "chart", roles: ["administrator", "clinician", "receptionist"], group: "Main" },
   { key: "doctors", path: "/admin/doctors", label: "Doctors", icon: "user", roles: ["administrator", "clinician", "receptionist"], group: "Main" },
@@ -257,7 +264,8 @@ function profileImageFor(record = {}, type) {
 function recordFromRtdValue(id, value = {}, path = "") {
   const data = value || {};
   const legacyId = data.id && data.id !== id ? data.id : data.legacyId;
-  return { ...data, legacyId, id, docId: id, uid: data.uid || id, _path: path ? `${path}/${id}` : "" };
+  const inferred = inferRegistration(path);
+  return { ...inferred, ...data, legacyId, id, docId: id, uid: data.uid || id, _path: path ? `${path}/${id}` : "" };
 }
 
 function recordId(record) {
@@ -266,7 +274,7 @@ function recordId(record) {
 
 function collectionPaths(name) {
   if (name === "doctors") return ["registration/doctors", "registration/clinicks/doctor"];
-  if (name === "users") return ["registration/admin", "registration/doctors", "registration/receptionist", "registration/clinicks/doctor", "registration/clinicks/reception"];
+  if (name === "users") return ["registration/admin", "registration/doctors", "registration/receptionist", "registration/nurses", "registration/clinicks/doctor", "registration/clinicks/reception", "registration/clinicks/nurse"];
   return [name];
 }
 
@@ -324,6 +332,12 @@ function statusBadge(status = "Active") {
   return <span className={`badge ${color}`}>{status}</span>;
 }
 
+function roleBadge(role = "") {
+  const normalized = normalizeRole(role);
+  const color = normalized === "administrator" ? "cyan" : normalized === "receptionist" ? "purple" : "teal";
+  return <span className={`badge ${color}`}>{roleLabels[normalized] || "Staff"}</span>;
+}
+
 function PageHeader({ config, children }) {
   return (
     <>
@@ -340,11 +354,11 @@ function PageHeader({ config, children }) {
   );
 }
 
-function Field({ label, name, type = "text", defaultValue = "", required = false }) {
+function Field({ label, name, type = "text", defaultValue = "", required = false, ...props }) {
   return (
     <div className="field">
       <label>{label}</label>
-      <input name={name} type={type} defaultValue={defaultValue || ""} required={required} />
+      <input name={name} type={type} defaultValue={defaultValue || ""} required={required} {...props} />
     </div>
   );
 }
@@ -549,7 +563,10 @@ function AdminPage({ page, config, params, profile, navigate, notify }) {
     async function load() {
       setData((current) => ({ ...current, loading: true }));
       const names = ["doctors", "patients", "diagnoses", "schedules"];
-      const entries = await Promise.all(names.map(async (name) => [name, await readCollection(clinicId, name)]));
+      const [entries, users] = await Promise.all([
+        Promise.all(names.map(async (name) => [name, await readCollection(clinicId, name)])),
+        profile.role === "administrator" ? readStaffUsers(clinicId) : Promise.resolve([]),
+      ]);
       if (!alive) return;
       const next = Object.fromEntries(entries);
       setData({
@@ -558,12 +575,12 @@ function AdminPage({ page, config, params, profile, navigate, notify }) {
         patients: next.patients,
         diagnoses: next.diagnoses,
         schedules: next.schedules,
-        users: [],
+        users,
       });
     }
     load();
     return () => { alive = false; };
-  }, [clinicId, page]);
+  }, [clinicId, page, profile.role]);
 
   async function saveRecord(name, payload, id = "", existingRecord = null) {
     const basePath = parentPath(existingRecord?._path) || primaryCollectionPath(name);
@@ -579,6 +596,7 @@ function AdminPage({ page, config, params, profile, navigate, notify }) {
 
     if (name === "doctors") {
       body.uid = payload.uid || targetId;
+      body.displayName = payload.displayName || payload.fullName || existingRecord?.displayName || payload.email || targetId;
       body.role = payload.role || "clinician";
       body.staffType = "doctor";
       body.active = payload.active ?? true;
@@ -638,7 +656,7 @@ function AdminPage({ page, config, params, profile, navigate, notify }) {
   if (page === "diagnoses") return <DiagnosesPage config={config} {...common} />;
   if (page === "reports") return <SimpleRecordsPage config={config} collection="diagnoses" title="Diagnosis Reports" rows={data.diagnoses} columns={["patientName", "description", "severity", "diagnosisDate"]} />;
   if (page === "schedules") return <SimpleRecordsPage config={config} collection="schedules" title="Doctor Schedules" rows={data.schedules} columns={["doctorName", "department", "day", "startTime", "endTime", "status"]} />;
-  if (page === "users") return <SimpleRecordsPage config={config} collection="users" title="Staff Users" rows={data.users} columns={["displayName", "email", "role", "active"]} empty="Staff user management remains connected to Firebase callable functions." />;
+  if (page === "users") return <StaffUsersPage config={config} users={data.users} profile={profile} notify={notify} />;
   if (page === "settings") return <SettingsPage config={config} notify={notify} />;
   return <DashboardPage config={config} {...common} />;
 }
@@ -666,6 +684,20 @@ async function readCollection(clinicId, name) {
   } catch (error) {
     console.warn(`Using sample ${name} data`, error);
     return samples[name] || [];
+  }
+}
+
+async function readStaffUsers(clinicId) {
+  try {
+    const listStaffUsers = httpsCallable(functions, "listStaffUsers");
+    const response = await listStaffUsers({ clinicId });
+    const users = Array.isArray(response.data?.users) ? response.data.users : [];
+    return users
+      .filter((user) => !user.clinicId || user.clinicId === clinicId)
+      .map((user) => ({ ...user, id: user.uid || user.id }));
+  } catch (error) {
+    console.warn("Could not read staff users through Functions API", error);
+    return readCollection(clinicId, "users");
   }
 }
 
@@ -751,7 +783,7 @@ function DoctorsPage({ config, data, navigate, removeRecord, profile, deletingKe
   );
 }
 
-function DoctorFormPage({ config, data, params, profile, navigate, saveRecord }) {
+function DoctorFormPage({ config, data, params, profile, navigate, saveRecord, notify }) {
   const id = params.get("id") || "";
   const clinicId = profile.clinicId || defaultClinicId;
   const [doctor, setDoctor] = useState(data.doctors.find((item) => recordId(item) === id) || {});
@@ -772,10 +804,36 @@ function DoctorFormPage({ config, data, params, profile, navigate, saveRecord })
       const form = new FormData(event.currentTarget);
       const photoFile = form.get("photoFile");
       const payload = Object.fromEntries(form.entries());
-      const targetId = id || payload.id || push(ref(rtdb, primaryCollectionPath("doctors"))).key;
+      const temporaryPassword = String(payload.temporaryPassword || "").trim();
+      let targetId = id || payload.id || "";
       delete payload.id;
       delete payload.photoFile;
+      delete payload.temporaryPassword;
       payload.gender = normalizeGender(payload.gender);
+
+      if (!id) {
+        if (!payload.email) {
+          throw new Error("Doctor email is required to create the Firebase Auth account.");
+        }
+        if (temporaryPassword.length < 8) {
+          throw new Error("Temporary password must be at least 8 characters.");
+        }
+        const createStaffUser = httpsCallable(functions, "createStaffUser");
+        const response = await createStaffUser({
+          displayName: payload.fullName || payload.email,
+          email: payload.email,
+          temporaryPassword,
+          staffType: "doctor",
+          department: payload.department || payload.specialty || "General",
+          active: true,
+          clinicId,
+        });
+        targetId = response.data?.uid || "";
+        if (!targetId) {
+          throw new Error("Firebase Auth did not return a staff user id.");
+        }
+        payload.uid = targetId;
+      }
 
       if (photoFile instanceof File && photoFile.size > 0) {
         Object.assign(payload, await uploadProfilePhoto({ clinicId, collectionName: "doctors", recordId: targetId, file: photoFile }));
@@ -787,6 +845,7 @@ function DoctorFormPage({ config, data, params, profile, navigate, saveRecord })
       }
 
       await saveRecord("doctors", payload, targetId, doctor);
+      notify(id ? "Doctor profile saved." : "Doctor Auth account and profile created.");
       navigate("doctors");
     } catch (error) {
       console.error("Doctor save failed", error);
@@ -806,10 +865,15 @@ function DoctorFormPage({ config, data, params, profile, navigate, saveRecord })
             <PhotoField currentUrl={doctor.photoUrl} fallbackUrl={defaultProfileImage("doctor", doctor.gender)} />
             <Field label="Full Name" name="fullName" defaultValue={doctor.fullName} required />
             <SelectField label="Gender" name="gender" options={["Male", "Female", "Other"]} defaultValue={normalizeGender(doctor.gender)} />
-            <Field label="Email" name="email" type="email" defaultValue={doctor.email} />
+            <Field label="Email" name="email" type="email" defaultValue={doctor.email} required={!id} />
             <Field label="Phone Number" name="phone" defaultValue={doctor.phone} />
             <Field label="Office Room" name="room" defaultValue={doctor.room || doctor.officeRoom} />
           </FormSection>
+          {!id ? (
+            <FormSection title="Account Access">
+              <Field label="Temporary Password" name="temporaryPassword" type="password" required minLength={8} />
+            </FormSection>
+          ) : null}
           <FormSection title="Professional Details">
             <Field label="Specialty" name="specialty" defaultValue={doctor.specialty} />
             <Field label="Department" name="department" defaultValue={doctor.department} />
@@ -1028,6 +1092,169 @@ function DiagnosesPage({ config, data, removeRecord, profile, deletingKey }) {
             canDelete ? <button className="btn small danger" type="button" disabled={deletingKey === `diagnoses:${item.id}`} onClick={() => removeRecord("diagnoses", item.id)}>{deletingKey === `diagnoses:${item.id}` ? "Deleting..." : "Delete"}</button> : "-",
           ]}
         />
+      </div>
+    </>
+  );
+}
+
+function StaffUsersPage({ config, users, profile, notify }) {
+  const clinicId = profile.clinicId || defaultClinicId;
+  const [rows, setRows] = useState(users || []);
+  const [search, setSearch] = useState("");
+  const [busy, setBusy] = useState("");
+
+  useEffect(() => {
+    setRows(users || []);
+  }, [users]);
+
+  const filtered = useMemo(() => {
+    const term = search.toLowerCase();
+    return rows.filter((user) => {
+      const role = normalizeRole(user.role || user.staffType);
+      return `${user.displayName || ""} ${user.email || ""} ${role} ${user.staffType || ""} ${user.department || ""}`.toLowerCase().includes(term);
+    });
+  }, [rows, search]);
+
+  async function refreshUsers() {
+    setRows(await readStaffUsers(clinicId));
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = Object.fromEntries(new FormData(form).entries());
+    const temporaryPassword = String(data.temporaryPassword || "").trim();
+    if (temporaryPassword.length < 8) {
+      notify("Temporary password must be at least 8 characters.");
+      return;
+    }
+
+    setBusy("create");
+    try {
+      const createStaffUser = httpsCallable(functions, "createStaffUser");
+      await createStaffUser({
+        displayName: data.displayName,
+        email: data.email,
+        temporaryPassword,
+        staffType: data.staffType || "doctor",
+        department: data.department || "General",
+        active: data.active === "true",
+        clinicId,
+      });
+      form.reset();
+      await refreshUsers();
+      notify("Staff user created in Firebase Auth.");
+    } catch (error) {
+      console.error("Staff user creation failed", error);
+      notify(error.message || "Could not create staff user.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function handleDisable(uid) {
+    if (!uid || uid === profile.uid || !window.confirm("Disable this staff user?")) return;
+    setBusy(`disable:${uid}`);
+    try {
+      const disableStaffUser = httpsCallable(functions, "disableStaffUser");
+      await disableStaffUser({ uid, clinicId });
+      setRows((current) => current.map((user) => (user.uid || user.id) === uid ? { ...user, active: false, status: "disabled" } : user));
+      notify("Staff user disabled.");
+    } catch (error) {
+      console.error("Staff user disable failed", error);
+      notify(error.message || "Could not disable staff user.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function handleStaffTypeChange(user, staffType) {
+    const uid = user.uid || user.id;
+    const previous = staffTypeForRole(normalizeRole(user.role || user.staffType), user.staffType);
+    if (!uid || staffType === previous) return;
+    if (!window.confirm(`Change this staff member to ${staffTypeLabels[staffType] || staffType}?`)) return;
+
+    setBusy(`role:${uid}`);
+    try {
+      const setStaffRole = httpsCallable(functions, "setStaffRole");
+      const response = await setStaffRole({ uid, staffType, clinicId, department: user.department || user.departmentId || "" });
+      setRows((current) => current.map((item) => {
+        if ((item.uid || item.id) !== uid) return item;
+        return {
+          ...item,
+          role: response.data?.role || normalizeRole(staffType),
+          staffType: response.data?.staffType || staffType,
+          active: response.data?.active ?? item.active,
+        };
+      }));
+      notify("Staff role updated.");
+    } catch (error) {
+      console.error("Staff role update failed", error);
+      notify(error.message || "Could not update staff role.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  return (
+    <>
+      <PageHeader config={config} />
+      <div className="grid two">
+        <div>
+          <div className="toolbar">
+            <div className="search-field"><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search staff by name, email, role, or department" /></div>
+          </div>
+          <div className="panel">
+            <ResponsiveTable
+              columns={["Name", "Email", "Role", "Staff Type", "Department", "Status", "Actions"]}
+              rows={filtered}
+              empty="No staff users found."
+              renderRow={(user) => {
+                const uid = user.uid || user.id || "";
+                const role = normalizeRole(user.role || user.staffType);
+                const staffType = staffTypeForRole(role, user.staffType);
+                return [
+                  <Entity name={user.displayName || user.email || uid} note={uid} />,
+                  user.email || "-",
+                  roleBadge(user.role || user.staffType),
+                  <select className="table-select" value={staffType} disabled={uid === profile.uid || busy === `role:${uid}`} onChange={(event) => handleStaffTypeChange(user, event.target.value)}>
+                    {Object.entries(staffTypeLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}
+                  </select>,
+                  user.department || user.departmentId || "-",
+                  statusBadge(user.active === false || user.status === "disabled" ? "Disabled" : "Active"),
+                  <button className="btn small danger" type="button" disabled={uid === profile.uid || busy === `disable:${uid}`} onClick={() => handleDisable(uid)}>{busy === `disable:${uid}` ? "Disabling..." : "Disable"}</button>,
+                ];
+              }}
+            />
+          </div>
+        </div>
+        <div className="panel pad">
+          <h2 className="panel-title">Add Staff User</h2>
+          <form onSubmit={handleSubmit}>
+            <FormSection title="Account">
+              <Field label="Full Name" name="displayName" required />
+              <Field label="Email" name="email" type="email" required />
+              <Field label="Temporary Password" name="temporaryPassword" type="password" required minLength={8} />
+              <div className="field">
+                <label>Staff Type</label>
+                <select name="staffType" defaultValue="doctor">
+                  {Object.entries(staffTypeLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}
+                </select>
+              </div>
+              <Field label="Department" name="department" defaultValue="General" />
+              <div className="field">
+                <label>Status</label>
+                <select name="active" defaultValue="true">
+                  <option value="true">Active</option>
+                  <option value="false">Disabled</option>
+                </select>
+              </div>
+            </FormSection>
+            <div className="form-actions">
+              <button className="btn primary" type="submit" disabled={busy === "create"}>{busy === "create" ? "Creating..." : "Create Staff User"}</button>
+            </div>
+          </form>
+        </div>
       </div>
     </>
   );

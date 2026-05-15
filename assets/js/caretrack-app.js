@@ -574,7 +574,9 @@ function bindRecordForm(selector, collectionName, transform, successUrl) {
     try {
       const id = valueOf(form, "id");
       const payload = await transform(formPayload(form), form);
-      const savedId = await saveRecord(collectionName, payload, id);
+      const targetId = payload.__id || id;
+      delete payload.__id;
+      const savedId = await saveRecord(collectionName, payload, targetId);
       toast("Record saved.");
       setTimeout(() => {
         window.location.href = typeof successUrl === "function" ? successUrl(savedId) : successUrl;
@@ -701,6 +703,9 @@ async function renderDoctorForm(config) {
           field("Phone Number", "phone", doctor.phone || ""),
           field("Office Room", "room", doctor.room || doctor.officeRoom || ""),
         ])}
+        ${!id ? formSection("Account Access", [
+          field("Temporary Password", "temporaryPassword", "", "password"),
+        ]) : ""}
         ${formSection("Professional Details", [
           field("Specialty", "specialty", doctor.specialty || ""),
           field("Department", "department", doctor.department || ""),
@@ -1159,10 +1164,49 @@ function infoRow(label, value = "-") {
 function bindPageBehavior() {
   wireTableTools();
 
-  bindRecordForm("#doctorForm", "doctors", async (data) => ({
-    ...data,
-    assignedPatients: Number(data.assignedPatients || 0),
-  }), pageUrl("doctors"));
+  bindRecordForm("#doctorForm", "doctors", async (data, form) => {
+    const id = valueOf(form, "id");
+    const temporaryPassword = String(data.temporaryPassword || "").trim();
+    delete data.temporaryPassword;
+
+    if (!id) {
+      if (!data.email) {
+        throw new Error("Doctor email is required to create the Firebase Auth account.");
+      }
+      if (temporaryPassword.length < 8) {
+        throw new Error("Temporary password must be at least 8 characters.");
+      }
+      const createStaffUser = httpsCallable(functions, "createStaffUser");
+      const response = await createStaffUser({
+        displayName: data.fullName || data.email,
+        email: data.email,
+        temporaryPassword,
+        staffType: "doctor",
+        department: data.department || data.specialty || "General",
+        active: true,
+        clinicId: state.clinicId,
+      });
+      const uid = response.data?.uid;
+      if (!uid) {
+        throw new Error("Firebase Auth did not return a staff user id.");
+      }
+      return {
+        ...data,
+        __id: uid,
+        uid,
+        displayName: data.fullName || data.email,
+        role: "clinician",
+        staffType: "doctor",
+        active: true,
+        assignedPatients: Number(data.assignedPatients || 0),
+      };
+    }
+
+    return {
+      ...data,
+      assignedPatients: Number(data.assignedPatients || 0),
+    };
+  }, pageUrl("doctors"));
 
   bindRecordForm("#patientForm", "patients", async (data, form) => {
     const doctors = await readDocs("doctors", samples.doctors);

@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_VERSION = "caretrack-app-v5";
+const CACHE_VERSION = "caretrack-app-v6";
 const HEALTH_PATH = "/__caretrack_health";
 const PRECACHE_ASSETS = [
   "/",

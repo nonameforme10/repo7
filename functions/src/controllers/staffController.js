@@ -59,7 +59,7 @@ async function createStaffUser(request) {
   let userRecord;
   try {
     userRecord = await getAuthUserByEmail(email);
-    await updateAuthUser(userRecord.uid, {displayName, active});
+    await updateAuthUser(userRecord.uid, {displayName, active, password: temporaryPassword || undefined});
   } catch (error) {
     if (error.code !== "auth/user-not-found") throw error;
     if (!temporaryPassword) {

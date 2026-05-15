@@ -32,11 +32,13 @@ async function createAuthUser({email, password, displayName, active}) {
   });
 }
 
-async function updateAuthUser(uid, {displayName, active}) {
-  return auth.updateUser(uid, {
+async function updateAuthUser(uid, {displayName, active, password}) {
+  const updates = {
     displayName,
     disabled: active !== true,
-  });
+  };
+  if (password) updates.password = password;
+  return auth.updateUser(uid, updates);
 }
 
 async function saveStaffProfile(clinicId, uid, payload) {
