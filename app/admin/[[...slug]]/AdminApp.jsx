@@ -239,6 +239,19 @@ function patientName(patient = {}) {
   return [patient.firstName, patient.lastName].filter(Boolean).join(" ") || patient.fullName || patient.name || "Unnamed Patient";
 }
 
+function patientPublicIdFromKey(key = "") {
+  const suffix = String(key || "").replace(/[^a-z0-9]/gi, "").slice(-6).toUpperCase();
+  return `PT-${suffix || Date.now().toString().slice(-6)}`;
+}
+
+function createDraftPatientIdentity() {
+  const key = push(ref(rtdb, primaryCollectionPath("patients"))).key || "";
+  return {
+    id: key,
+    patientId: patientPublicIdFromKey(key),
+  };
+}
+
 function normalizeGender(value = "") {
   const gender = String(value || "").toLowerCase().trim();
   if (["male", "man"].includes(gender)) return "Male";
@@ -271,6 +284,128 @@ function recordFromRtdValue(id, value = {}, path = "") {
 
 function recordId(record) {
   return String(record?.docId || record?.id || "");
+}
+
+function findAssignedDoctor(doctors = [], patient = {}) {
+  const assignedId = String(patient.assignedDoctorId || "");
+  const assignedName = String(patient.assignedDoctorName || "");
+  return doctors.find((doctor) => recordId(doctor) === assignedId || doctorName(doctor) === assignedName) || null;
+}
+
+const scheduleWeekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const scheduleDayNames = {
+  mon: "Monday",
+  monday: "Monday",
+  tue: "Tuesday",
+  tues: "Tuesday",
+  tuesday: "Tuesday",
+  wed: "Wednesday",
+  wednesday: "Wednesday",
+  thu: "Thursday",
+  thur: "Thursday",
+  thurs: "Thursday",
+  thursday: "Thursday",
+  fri: "Friday",
+  friday: "Friday",
+  sat: "Saturday",
+  saturday: "Saturday",
+  sun: "Sunday",
+  sunday: "Sunday",
+};
+
+function normalizeScheduleDay(value = "") {
+  const key = String(value || "").toLowerCase().replace(/[^a-z]/g, "");
+  return scheduleDayNames[key] || "";
+}
+
+function expandScheduleRange(start, end) {
+  const startDay = normalizeScheduleDay(start);
+  const endDay = normalizeScheduleDay(end);
+  const startIndex = scheduleWeekdays.indexOf(startDay);
+  const endIndex = scheduleWeekdays.indexOf(endDay);
+  if (startIndex < 0 || endIndex < 0) return [];
+  if (startIndex <= endIndex) return scheduleWeekdays.slice(startIndex, endIndex + 1);
+  return [...scheduleWeekdays.slice(startIndex), ...scheduleWeekdays.slice(0, endIndex + 1)];
+}
+
+function splitScheduleDays(availability = "") {
+  const raw = String(availability || "").trim();
+  if (!raw) return ["Not set"];
+
+  const days = raw.split(/[,\n;/&]+/).flatMap((part) => {
+    const text = part.trim();
+    if (!text) return [];
+    const range = text.split(/\s*-\s*/);
+    if (range.length === 2) {
+      const expanded = expandScheduleRange(range[0], range[1]);
+      if (expanded.length) return expanded;
+    }
+    return normalizeScheduleDay(text) || text;
+  });
+
+  return [...new Set(days)].filter(Boolean).length ? [...new Set(days)].filter(Boolean) : [raw];
+}
+
+function patientsForDoctor(patients = [], doctor = {}) {
+  const doctorId = recordId(doctor);
+  const name = doctorName(doctor);
+  return patients.filter((patient) => patient.assignedDoctorId === doctorId || patient.assignedDoctorName === name);
+}
+
+function assignedPatientSummary(patients = []) {
+  if (!patients.length) return "0";
+  const names = patients.slice(0, 2).map(patientName).join(", ");
+  return patients.length > 2 ? `${names} +${patients.length - 2}` : names;
+}
+
+function buildScheduleRows(schedules = [], doctors = [], patients = []) {
+  const rows = [];
+  const explicitDoctorDays = new Set();
+
+  schedules.forEach((schedule) => {
+    const doctor = doctors.find((item) => {
+      const scheduleDoctorId = String(schedule.doctorId || schedule.assignedDoctorId || "");
+      return recordId(item) === scheduleDoctorId || doctorName(item) === schedule.doctorName;
+    }) || {};
+    const assignedPatients = doctor.id ? patientsForDoctor(patients, doctor) : [];
+    const doctorId = recordId(doctor) || schedule.doctorId || "";
+    const day = schedule.day || "Not set";
+
+    if (doctorId) explicitDoctorDays.add(`${doctorId}:${day}`);
+    rows.push({
+      ...schedule,
+      id: schedule.id || `${doctorId || schedule.doctorName || "schedule"}:${day}`,
+      doctorName: schedule.doctorName || doctorName(doctor),
+      department: schedule.department || doctor.department || "-",
+      room: schedule.room || doctor.room || doctor.officeRoom || "-",
+      status: schedule.status || doctor.status || "Available",
+      startTime: schedule.startTime || doctor.startTime || "-",
+      endTime: schedule.endTime || doctor.endTime || "-",
+      day,
+      assignedPatients: assignedPatientSummary(assignedPatients),
+    });
+  });
+
+  doctors.forEach((doctor) => {
+    const doctorId = recordId(doctor);
+    const assignedPatients = patientsForDoctor(patients, doctor);
+    splitScheduleDays(doctor.availability).forEach((day) => {
+      if (explicitDoctorDays.has(`${doctorId}:${day}`)) return;
+      rows.push({
+        id: `${doctorId}:${day}`,
+        doctorName: doctorName(doctor),
+        department: doctor.department || "-",
+        day,
+        startTime: doctor.startTime || "-",
+        endTime: doctor.endTime || "-",
+        room: doctor.room || doctor.officeRoom || "-",
+        status: doctor.status || "Available",
+        assignedPatients: assignedPatientSummary(assignedPatients),
+      });
+    });
+  });
+
+  return rows;
 }
 
 function collectionPaths(name) {
@@ -355,11 +490,12 @@ function PageHeader({ config, children }) {
   );
 }
 
-function Field({ label, name, type = "text", defaultValue = "", required = false, ...props }) {
+function Field({ label, name, type = "text", defaultValue = "", value, required = false, ...props }) {
+  const valueProps = value === undefined ? { defaultValue: defaultValue || "" } : { value: value || "" };
   return (
     <div className="field">
       <label>{label}</label>
-      <input name={name} type={type} defaultValue={defaultValue || ""} required={required} {...props} />
+      <input name={name} type={type} required={required} {...valueProps} {...props} />
     </div>
   );
 }
@@ -656,7 +792,7 @@ function AdminPage({ page, config, params, profile, navigate, notify }) {
   if (page === "patient-profile") return <PatientProfilePage config={config} {...common} />;
   if (page === "diagnoses") return <DiagnosesPage config={config} {...common} />;
   if (page === "reports") return <SimpleRecordsPage config={config} collection="diagnoses" title="Diagnosis Reports" rows={data.diagnoses} columns={["patientName", "description", "severity", "diagnosisDate"]} />;
-  if (page === "schedules") return <SimpleRecordsPage config={config} collection="schedules" title="Doctor Schedules" rows={data.schedules} columns={["doctorName", "department", "day", "startTime", "endTime", "status"]} />;
+  if (page === "schedules") return <SchedulesPage config={config} data={data} />;
   if (page === "users") return <StaffUsersPage config={config} users={data.users} profile={profile} notify={notify} />;
   if (page === "settings") return <SettingsPage config={config} notify={notify} />;
   return <DashboardPage config={config} {...common} />;
@@ -961,16 +1097,27 @@ function PatientsPage({ config, data, navigate, removeRecord, profile, deletingK
 function PatientFormPage({ config, data, params, profile, navigate, saveRecord }) {
   const id = params.get("id") || "";
   const clinicId = profile.clinicId || defaultClinicId;
+  const [draftPatient] = useState(createDraftPatientIdentity);
   const [patient, setPatient] = useState(data.patients.find((item) => recordId(item) === id) || {});
+  const [selectedDoctorId, setSelectedDoctorId] = useState(() => recordId(findAssignedDoctor(data.doctors, data.patients.find((item) => recordId(item) === id) || {})) || "");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let alive = true;
     readOne(clinicId, "patients", id, data.patients.find((item) => recordId(item) === id) || {}).then((record) => {
-      if (alive) setPatient(record);
+      if (!alive) return;
+      setPatient(record);
+      setSelectedDoctorId(recordId(findAssignedDoctor(data.doctors, record)) || record.assignedDoctorId || "");
     });
     return () => { alive = false; };
   }, [clinicId, data.patients, id]);
+
+  useEffect(() => {
+    const assignedDoctor = findAssignedDoctor(data.doctors, patient);
+    if (assignedDoctor) {
+      setSelectedDoctorId(recordId(assignedDoctor));
+    }
+  }, [data.doctors, patient.assignedDoctorId, patient.assignedDoctorName]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -979,13 +1126,15 @@ function PatientFormPage({ config, data, params, profile, navigate, saveRecord }
       const form = new FormData(event.currentTarget);
       const photoFile = form.get("photoFile");
       const payload = Object.fromEntries(form.entries());
-      const targetId = id || payload.id || push(ref(rtdb, primaryCollectionPath("patients"))).key;
-      const doctor = data.doctors.find((item) => recordId(item) === payload.assignedDoctorId);
+      const targetId = id || payload.id || draftPatient.id || push(ref(rtdb, primaryCollectionPath("patients"))).key;
+      const doctor = data.doctors.find((item) => recordId(item) === selectedDoctorId);
       delete payload.id;
       delete payload.photoFile;
       payload.gender = normalizeGender(payload.gender);
+      payload.assignedDoctorId = selectedDoctorId;
       payload.assignedDoctorName = doctor ? doctorName(doctor) : patient.assignedDoctorName || "";
-      payload.patientId = patient.patientId || payload.patientId || targetId || "";
+      payload.department = selectedDoctorId ? doctor?.department || "" : patient.department || "";
+      payload.patientId = patient.patientId || (id ? targetId : draftPatient.patientId) || patientPublicIdFromKey(targetId);
 
       if (photoFile instanceof File && photoFile.size > 0) {
         Object.assign(payload, await uploadProfilePhoto({ clinicId, collectionName: "patients", recordId: targetId, file: photoFile }));
@@ -1006,6 +1155,10 @@ function PatientFormPage({ config, data, params, profile, navigate, saveRecord }
     }
   }
 
+  const selectedDoctor = data.doctors.find((item) => recordId(item) === selectedDoctorId) || {};
+  const publicPatientId = id ? patient.patientId || recordId(patient) || draftPatient.patientId : patient.patientId || draftPatient.patientId;
+  const autoDepartment = selectedDoctorId ? selectedDoctor.department || "" : patient.department || "";
+
   return (
     <>
       <PageHeader config={{ ...config, title: id ? "Edit Patient" : "Register Patient" }}><button className="btn" type="button" onClick={() => navigate("patients")}>Cancel</button></PageHeader>
@@ -1016,7 +1169,7 @@ function PatientFormPage({ config, data, params, profile, navigate, saveRecord }
             <PhotoField currentUrl={patient.photoUrl} fallbackUrl={defaultProfileImage("patient", patient.gender)} />
             <Field label="First Name" name="firstName" defaultValue={patient.firstName} required />
             <Field label="Last Name" name="lastName" defaultValue={patient.lastName} required />
-            <Field label="Patient ID" name="patientId" defaultValue={patient.patientId || patient.id} />
+            <Field label="Patient ID" name="patientId" value={publicPatientId} readOnly />
             <Field label="Date of Birth" name="dateOfBirth" type="date" defaultValue={patient.dateOfBirth} />
             <SelectField label="Gender" name="gender" options={["Male", "Female", "Other"]} defaultValue={normalizeGender(patient.gender)} />
           </FormSection>
@@ -1028,7 +1181,7 @@ function PatientFormPage({ config, data, params, profile, navigate, saveRecord }
           <FormSection title="Doctor Assignment">
             <div className="field">
               <label>Assigned Doctor</label>
-              <select name="assignedDoctorId" defaultValue={patient.assignedDoctorId || ""}>
+              <select name="assignedDoctorId" value={selectedDoctorId} onChange={(event) => setSelectedDoctorId(event.target.value)}>
                 <option value="">Select doctor</option>
                 {data.doctors.map((doctor) => {
                   const doctorDocId = recordId(doctor);
@@ -1036,7 +1189,7 @@ function PatientFormPage({ config, data, params, profile, navigate, saveRecord }
                 })}
               </select>
             </div>
-            <Field label="Department" name="department" defaultValue={patient.department} />
+            <Field label="Department" name="department" value={autoDepartment} readOnly />
             <SelectField label="Status" name="status" options={["Stable", "Monitoring", "Critical"]} defaultValue={patient.status || "Stable"} />
           </FormSection>
           <div className="notice">Patient data is stored securely and visible only to authorized clinic staff.</div>
@@ -1256,6 +1409,44 @@ function StaffUsersPage({ config, users, profile, notify }) {
             </div>
           </form>
         </div>
+      </div>
+    </>
+  );
+}
+
+function SchedulesPage({ config, data }) {
+  const [search, setSearch] = useState("");
+  const rows = useMemo(() => buildScheduleRows(data.schedules, data.doctors, data.patients), [data.schedules, data.doctors, data.patients]);
+  const filtered = useMemo(() => {
+    const term = search.toLowerCase();
+    return rows.filter((row) => `${row.doctorName || ""} ${row.department || ""} ${row.day || ""} ${row.room || ""} ${row.assignedPatients || ""} ${row.status || ""}`.toLowerCase().includes(term));
+  }, [rows, search]);
+
+  return (
+    <>
+      <PageHeader config={config} />
+      <div className="toolbar">
+        <div className="search-field">
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search schedules by doctor, department, day, room, or patient" />
+        </div>
+      </div>
+      <div className="panel">
+        <div className="panel-header"><h2 className="panel-title">Doctor Schedules</h2></div>
+        <ResponsiveTable
+          columns={["Doctor Name", "Department", "Day", "Start Time", "End Time", "Room", "Assigned Patients", "Status"]}
+          rows={filtered}
+          empty="No doctor schedules found."
+          renderRow={(row) => [
+            row.doctorName || "-",
+            row.department || "-",
+            row.day || "-",
+            row.startTime || "-",
+            row.endTime || "-",
+            row.room || "-",
+            row.assignedPatients || "0",
+            statusBadge(row.status || "Available"),
+          ]}
+        />
       </div>
     </>
   );

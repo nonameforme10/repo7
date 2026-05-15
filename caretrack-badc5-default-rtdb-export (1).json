@@ -1,0 +1,148 @@
+{
+  "patients": {
+    "-Osgf97QF_sG5JdA1V_p": {
+      "address": "Mirza Yodgor",
+      "assignedDoctorId": "WhrHz6PthIgGj8dbOIEg5JOlmEB3",
+      "assignedDoctorName": "Temur",
+      "clinicId": "default",
+      "createdAt": 1778865971996,
+      "createdBy": "rqtoZBhoarWYC6HI7RrpOCNTAO72",
+      "dateOfBirth": "1963-05-16",
+      "department": "2 floor",
+      "email": "example@gmail.com",
+      "firstName": "Arthur",
+      "gender": "Male",
+      "id": "-Osgf97QF_sG5JdA1V_p",
+      "lastName": "Morgan",
+      "patientId": "#12231",
+      "phone": "908557585",
+      "photoUrl": "/assets/img/patient.webp",
+      "registeredBy": "rqtoZBhoarWYC6HI7RrpOCNTAO72",
+      "registeredByName": "Linda",
+      "status": "Critical",
+      "uid": "-Osgf97QF_sG5JdA1V_p",
+      "updatedAt": 1778865971996,
+      "updatedBy": "rqtoZBhoarWYC6HI7RrpOCNTAO72"
+    }
+  },
+  "registration": {
+    "admin": {
+      "sUSMlS40XlY96crZlyM2sG4Kdia2": {
+        "active": true,
+        "clinicId": "default",
+        "email": "admin@care.track",
+        "lastLoginAt": 1778849982865,
+        "lastLoginEmail": "admin@care.track",
+        "role": "administrator",
+        "staffType": "admin",
+        "status": "active",
+        "uid": "sUSMlS40XlY96crZlyM2sG4Kdia2",
+        "updatedAt": 1778849982865
+      },
+      "NRtf5wYZoKf95GfnlhB61lHVtFO2": {
+        "active": true,
+        "clinicId": "default",
+        "email": "admin2@care.track",
+        "lastLoginAt": 1778849982865,
+        "lastLoginEmail": "admin2@care.track",
+        "role": "administrator",
+        "staffType": "admin",
+        "status": "active",
+        "uid": "NRtf5wYZoKf95GfnlhB61lHVtFO2",
+        "updatedAt": 1778849982865
+      }
+    },
+    "doctors": {
+      "WhrHz6PthIgGj8dbOIEg5JOlmEB3": {
+        "active": true,
+        "availability": "Mon, Wed, Fri",
+        "clinicId": "default",
+        "createdAt": 1778864402436,
+        "createdBy": "sUSMlS40XlY96crZlyM2sG4Kdia2",
+        "department": "2 floor",
+        "displayName": "Temur",
+        "email": "kyuter789@gmail.com",
+        "endTime": "16:00",
+        "fullName": "Temur",
+        "gender": "Male",
+        "id": "WhrHz6PthIgGj8dbOIEg5JOlmEB3",
+        "phone": "908557585",
+        "photoUrl": "/assets/img/man-doc.webp",
+        "role": "clinician",
+        "room": "112",
+        "specialty": "Qulo duxturi",
+        "staffType": "doctor",
+        "startTime": "08:00",
+        "status": "Available",
+        "uid": "WhrHz6PthIgGj8dbOIEg5JOlmEB3",
+        "updatedAt": 1778864402436,
+        "updatedBy": "sUSMlS40XlY96crZlyM2sG4Kdia2"
+      }
+    },
+    "receptionist": {
+      "rqtoZBhoarWYC6HI7RrpOCNTAO72": {
+        "active": true,
+        "clinicId": "default",
+        "createdAt": 1778865662770,
+        "createdBy": "sUSMlS40XlY96crZlyM2sG4Kdia2",
+        "department": "General",
+        "departmentId": "General",
+        "displayName": "Linda",
+        "email": "linda@care.track",
+        "role": "receptionist",
+        "staffType": "reception",
+        "status": "active",
+        "uid": "rqtoZBhoarWYC6HI7RrpOCNTAO72",
+        "updatedAt": 1778865662770,
+        "updatedBy": "sUSMlS40XlY96crZlyM2sG4Kdia2"
+      }
+    }
+  },
+  "staffProfiles": {
+    "WhrHz6PthIgGj8dbOIEg5JOlmEB3": {
+      "active": true,
+      "clinicId": "default",
+      "department": "2 floor",
+      "departmentId": "2 floor",
+      "displayName": "Temur",
+      "email": "kyuter789@gmail.com",
+      "registrationPath": "registration/doctors/WhrHz6PthIgGj8dbOIEg5JOlmEB3",
+      "role": "clinician",
+      "staffType": "doctor",
+      "status": "active",
+      "uid": "WhrHz6PthIgGj8dbOIEg5JOlmEB3",
+      "updatedAt": 1778864401756,
+      "updatedBy": "sUSMlS40XlY96crZlyM2sG4Kdia2"
+    },
+    "rqtoZBhoarWYC6HI7RrpOCNTAO72": {
+      "active": true,
+      "clinicId": "default",
+      "department": "General",
+      "departmentId": "General",
+      "displayName": "Linda",
+      "email": "linda@care.track",
+      "registrationPath": "registration/receptionist/rqtoZBhoarWYC6HI7RrpOCNTAO72",
+      "role": "receptionist",
+      "staffType": "reception",
+      "status": "active",
+      "uid": "rqtoZBhoarWYC6HI7RrpOCNTAO72",
+      "updatedAt": 1778865663015,
+      "updatedBy": "sUSMlS40XlY96crZlyM2sG4Kdia2"
+    },
+    "sUSMlS40XlY96crZlyM2sG4Kdia2": {
+      "active": true,
+      "clinicId": "default",
+      "department": "",
+      "departmentId": "",
+      "displayName": "admin@care.track",
+      "email": "admin@care.track",
+      "lastLoginAt": 1778849982874,
+      "registrationPath": "registration/admin/sUSMlS40XlY96crZlyM2sG4Kdia2",
+      "role": "administrator",
+      "staffType": "admin",
+      "status": "active",
+      "uid": "sUSMlS40XlY96crZlyM2sG4Kdia2",
+      "updatedAt": 1778849982874
+    }
+  }
+}

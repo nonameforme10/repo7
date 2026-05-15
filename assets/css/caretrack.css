@@ -748,6 +748,12 @@ button {
   resize: vertical;
 }
 
+.field input[readonly] {
+  color: var(--text-soft);
+  background: rgba(148, 163, 184, 0.12);
+  cursor: default;
+}
+
 .field small {
   color: var(--faint);
   font-size: 12px;
