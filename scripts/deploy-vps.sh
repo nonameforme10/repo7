@@ -4,6 +4,7 @@ set -euo pipefail
 APP_DIR="${APP_DIR:-$HOME/repo7}"
 APP_NAME="${APP_NAME:-caretrack}"
 PORT="${PORT:-4173}"
+HEALTH_URL="http://127.0.0.1:$PORT/__caretrack_health"
 
 install_dependencies() {
   if npm ci; then
@@ -20,16 +21,23 @@ cd "$APP_DIR"
 
 git pull --ff-only
 
-if command -v pm2 >/dev/null 2>&1 && pm2 describe "$APP_NAME" >/dev/null 2>&1; then
-  echo "==> Stopping $APP_NAME before replacing dependencies"
-  pm2 stop "$APP_NAME" || true
-fi
-
 install_dependencies
 npm run build
 pm2 startOrReload ecosystem.config.cjs --update-env
 pm2 save
 pm2 status "$APP_NAME"
 
-curl -fsS "http://127.0.0.1:$PORT/__caretrack_health"
-echo
+echo "==> Waiting for $APP_NAME health check at $HEALTH_URL"
+for attempt in {1..30}; do
+  if curl -fsS "$HEALTH_URL"; then
+    echo
+    echo "==> $APP_NAME is healthy"
+    exit 0
+  fi
+
+  sleep 2
+done
+
+echo "==> $APP_NAME did not pass health check after 60 seconds" >&2
+pm2 logs "$APP_NAME" --lines 80 --nostream || true
+exit 1

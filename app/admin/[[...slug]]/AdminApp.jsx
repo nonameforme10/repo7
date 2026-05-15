@@ -360,18 +360,18 @@ function assignedPatientSummary(patients = []) {
 
 function buildScheduleRows(schedules = [], doctors = [], patients = []) {
   const rows = [];
-  const explicitDoctorDays = new Set();
+  const explicitDoctorIds = new Set();
 
   schedules.forEach((schedule) => {
     const doctor = doctors.find((item) => {
       const scheduleDoctorId = String(schedule.doctorId || schedule.assignedDoctorId || "");
       return recordId(item) === scheduleDoctorId || doctorName(item) === schedule.doctorName;
     }) || {};
-    const assignedPatients = doctor.id ? patientsForDoctor(patients, doctor) : [];
+    const assignedPatients = recordId(doctor) ? patientsForDoctor(patients, doctor) : [];
     const doctorId = recordId(doctor) || schedule.doctorId || "";
     const day = schedule.day || "Not set";
 
-    if (doctorId) explicitDoctorDays.add(`${doctorId}:${day}`);
+    if (doctorId) explicitDoctorIds.add(doctorId);
     rows.push({
       ...schedule,
       id: schedule.id || `${doctorId || schedule.doctorName || "schedule"}:${day}`,
@@ -388,20 +388,19 @@ function buildScheduleRows(schedules = [], doctors = [], patients = []) {
 
   doctors.forEach((doctor) => {
     const doctorId = recordId(doctor);
+    if (explicitDoctorIds.has(doctorId)) return;
+
     const assignedPatients = patientsForDoctor(patients, doctor);
-    splitScheduleDays(doctor.availability).forEach((day) => {
-      if (explicitDoctorDays.has(`${doctorId}:${day}`)) return;
-      rows.push({
-        id: `${doctorId}:${day}`,
-        doctorName: doctorName(doctor),
-        department: doctor.department || "-",
-        day,
-        startTime: doctor.startTime || "-",
-        endTime: doctor.endTime || "-",
-        room: doctor.room || doctor.officeRoom || "-",
-        status: doctor.status || "Available",
-        assignedPatients: assignedPatientSummary(assignedPatients),
-      });
+    rows.push({
+      id: `${doctorId}:profile-schedule`,
+      doctorName: doctorName(doctor),
+      department: doctor.department || "-",
+      day: doctor.availability || "Not set",
+      startTime: doctor.startTime || "-",
+      endTime: doctor.endTime || "-",
+      room: doctor.room || doctor.officeRoom || "-",
+      status: doctor.status || "Available",
+      assignedPatients: assignedPatientSummary(assignedPatients),
     });
   });
 
