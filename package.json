@@ -1,10 +1,12 @@
 {
   "scripts": {
+    "prebuild": "node scripts/sync-public-assets.cjs",
     "dev": "node server.js --dev",
     "build": "next build",
     "start": "node server.js",
     "serve": "node server.js --dev",
-    "vps:start": "pm2 startOrReload ecosystem.config.cjs --update-env",
+    "vps:start": "npm run build && pm2 startOrReload ecosystem.config.cjs --update-env",
+    "vps:reload": "pm2 startOrReload ecosystem.config.cjs --update-env",
     "vps:logs": "pm2 logs caretrack",
     "test:e2e": "playwright test",
     "deploy:functions": "firebase deploy --only functions",
