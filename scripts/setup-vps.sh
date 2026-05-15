@@ -7,6 +7,16 @@ PORT="${PORT:-4173}"
 DOMAIN="${DOMAIN:-_}"
 NODE_MAJOR="${NODE_MAJOR:-24}"
 
+install_dependencies() {
+  if npm ci; then
+    return 0
+  fi
+
+  echo "==> npm ci failed; removing node_modules and retrying once"
+  rm -rf node_modules
+  npm ci
+}
+
 echo "==> CareTrack first-time VPS setup"
 echo "App directory: $APP_DIR"
 echo "Nginx server_name: $DOMAIN"
@@ -29,7 +39,7 @@ if ! command -v pm2 >/dev/null 2>&1; then
 fi
 
 echo "==> Installing app dependencies"
-npm ci
+install_dependencies
 
 echo "==> Building Next.js app"
 npm run build
