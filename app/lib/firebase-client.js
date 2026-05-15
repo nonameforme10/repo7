@@ -28,6 +28,7 @@ import {
 } from "firebase/firestore";
 import { get, getDatabase, ref, update } from "firebase/database";
 import { getFunctions, httpsCallable } from "firebase/functions";
+import { getDownloadURL, getStorage, ref as storageRef, uploadBytes } from "firebase/storage";
 
 export const firebaseConfig = {
   apiKey: "AIzaSyCUHW7BfQCqmDwGKGpxXSXOSR55xnPUP-A",
@@ -46,6 +47,7 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const rtdb = getDatabase(app);
 export const functions = getFunctions(app);
+export const storage = getStorage(app);
 
 export {
   addDoc,
@@ -57,6 +59,7 @@ export {
   get,
   getDoc,
   getDocs,
+  getDownloadURL,
   httpsCallable,
   limit,
   onAuthStateChanged,
@@ -69,6 +72,8 @@ export {
   setPersistence,
   signInWithEmailAndPassword,
   signOut,
+  storageRef,
   update,
+  uploadBytes,
   where,
 };

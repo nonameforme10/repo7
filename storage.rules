@@ -33,6 +33,11 @@ service firebase.storage {
       allow write: if isAdmin(clinic) || isClinician(clinic) || isReceptionist(clinic);
     }
 
+    match /clinics/{clinic}/doctors/{doctorId}/{allPaths=**} {
+      allow read: if inClinic(clinic);
+      allow write: if isAdmin(clinic);
+    }
+
     match /clinics/{clinic}/reports/{allPaths=**} {
       allow read: if inClinic(clinic);
       allow write: if isAdmin(clinic) || isClinician(clinic);

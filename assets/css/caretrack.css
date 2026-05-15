@@ -276,6 +276,7 @@ button {
   background: linear-gradient(135deg, var(--cyan), var(--blue));
   box-shadow: 0 10px 24px rgba(6, 182, 212, 0.18);
   flex: 0 0 auto;
+  overflow: hidden;
 }
 
 .avatar.large {
@@ -283,6 +284,39 @@ button {
   height: 76px;
   font-size: 22px;
   border-radius: 22px;
+}
+
+.avatar.with-photo,
+.avatar.photo-preview {
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.photo-control {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.photo-preview {
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+}
+
+.photo-control input[type="file"] {
+  min-height: auto;
+  padding: 10px;
 }
 
 .app-shell {

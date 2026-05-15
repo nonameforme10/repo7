@@ -21,9 +21,16 @@ import {
   serverTimestamp,
   setDoc,
   signOut,
+  storage,
+  storageRef,
+  uploadBytes,
+  getDownloadURL,
 } from "../../lib/firebase-client";
 
 const logoUrl = "/assets/img/logo.png";
+const defaultDoctorManUrl = "/assets/img/man-doc.webp";
+const defaultDoctorWomanUrl = "/assets/img/woman-doc.webp";
+const defaultPatientUrl = "/assets/img/patient.webp";
 
 const roleLabels = {
   administrator: "Administrator",
@@ -233,6 +240,56 @@ function patientName(patient = {}) {
   return [patient.firstName, patient.lastName].filter(Boolean).join(" ") || patient.fullName || patient.name || "Unnamed Patient";
 }
 
+function normalizeGender(value = "") {
+  const gender = String(value || "").toLowerCase().trim();
+  if (["male", "man"].includes(gender)) return "Male";
+  if (["female", "woman"].includes(gender)) return "Female";
+  if (gender === "other") return "Other";
+  return "";
+}
+
+function defaultProfileImage(type, gender = "") {
+  if (type === "doctor") {
+    return normalizeGender(gender) === "Female" ? defaultDoctorWomanUrl : defaultDoctorManUrl;
+  }
+  return defaultPatientUrl;
+}
+
+function isDefaultProfileImage(url = "") {
+  return [defaultDoctorManUrl, defaultDoctorWomanUrl, defaultPatientUrl].includes(String(url || ""));
+}
+
+function profileImageFor(record = {}, type) {
+  return record.photoUrl || record.imageUrl || record.avatarUrl || defaultProfileImage(type, record.gender);
+}
+
+function fileExtension(file) {
+  const fromName = String(file?.name || "").split(".").pop();
+  if (fromName && fromName !== file?.name) return fromName.toLowerCase();
+  return String(file?.type || "image/jpeg").split("/").pop() || "jpg";
+}
+
+async function uploadProfilePhoto({ clinicId, collectionName, recordId, file }) {
+  if (!file || !recordId) return null;
+  if (!file.type?.startsWith("image/")) {
+    throw new Error("Please choose an image file.");
+  }
+  if (file.size > 3 * 1024 * 1024) {
+    throw new Error("Profile image must be 3 MB or smaller.");
+  }
+
+  const path = `clinics/${clinicId}/${collectionName}/${recordId}/profile.${fileExtension(file)}`;
+  const imageRef = storageRef(storage, path);
+  await uploadBytes(imageRef, file, {
+    contentType: file.type || "image/jpeg",
+    customMetadata: { source: "caretrack-admin" },
+  });
+  return {
+    photoUrl: await getDownloadURL(imageRef),
+    photoPath: path,
+  };
+}
+
 function ageFromDob(dob) {
   if (!dob) return "";
   const birth = new Date(dob);
@@ -294,6 +351,24 @@ function SelectField({ label, name, options, defaultValue = "" }) {
         <option value="">Select</option>
         {options.map((option) => <option value={option} key={option}>{option}</option>)}
       </select>
+    </div>
+  );
+}
+
+function PhotoField({ label = "Profile Photo", name = "photoFile", currentUrl, fallbackUrl }) {
+  const previewUrl = currentUrl || fallbackUrl;
+  return (
+    <div className="field full photo-field">
+      <label>{label}</label>
+      <div className="photo-control">
+        <span className="avatar photo-preview">
+          <img src={previewUrl} alt="" />
+        </span>
+        <div>
+          <input name={name} type="file" accept="image/*" />
+          <small>Upload JPG, PNG, or WebP. If empty, CareTrack uses the default profile image.</small>
+        </div>
+      </div>
     </div>
   );
 }
@@ -622,7 +697,7 @@ function DoctorsPage({ config, data, navigate, removeRecord, profile, deletingKe
           rows={doctors}
           empty="No doctors found."
           renderRow={(doctor) => [
-            <Entity key="name" name={doctorName(doctor)} note={doctor.room || doctor.officeRoom || "Room pending"} />,
+            <Entity key="name" name={doctorName(doctor)} note={doctor.room || doctor.officeRoom || "Room pending"} photoUrl={profileImageFor(doctor, "doctor")} />,
             doctor.specialty || "-",
             doctor.department || "-",
             <span key="contact">{doctor.phone || "-"}<br /><span style={{ color: "var(--faint)" }}>{doctor.email || ""}</span></span>,
@@ -657,12 +732,32 @@ function DoctorFormPage({ config, data, params, profile, navigate, saveRecord })
   async function handleSubmit(event) {
     event.preventDefault();
     setBusy(true);
-    const form = new FormData(event.currentTarget);
-    const payload = Object.fromEntries(form.entries());
-    const recordId = payload.id || id;
-    delete payload.id;
-    await saveRecord("doctors", payload, recordId);
-    navigate("doctors");
+    try {
+      const form = new FormData(event.currentTarget);
+      const photoFile = form.get("photoFile");
+      const payload = Object.fromEntries(form.entries());
+      const recordId = payload.id || id || doc(collection(db, "clinics", clinicId, "doctors")).id;
+      delete payload.id;
+      delete payload.photoFile;
+      payload.gender = normalizeGender(payload.gender);
+
+      if (photoFile instanceof File && photoFile.size > 0) {
+        Object.assign(payload, await uploadProfilePhoto({ clinicId, collectionName: "doctors", recordId, file: photoFile }));
+      } else if (!doctor.photoUrl || isDefaultProfileImage(doctor.photoUrl)) {
+        payload.photoUrl = defaultProfileImage("doctor", payload.gender);
+      } else {
+        payload.photoUrl = doctor.photoUrl;
+        if (doctor.photoPath) payload.photoPath = doctor.photoPath;
+      }
+
+      await saveRecord("doctors", payload, recordId);
+      navigate("doctors");
+    } catch (error) {
+      console.error("Doctor save failed", error);
+      alert(error.message || "Could not save doctor.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -672,7 +767,9 @@ function DoctorFormPage({ config, data, params, profile, navigate, saveRecord })
         <form onSubmit={handleSubmit} key={doctor.id || id || "new-doctor"}>
           <input type="hidden" name="id" value={id} readOnly />
           <FormSection title="Personal Information">
+            <PhotoField currentUrl={doctor.photoUrl} fallbackUrl={defaultProfileImage("doctor", doctor.gender)} />
             <Field label="Full Name" name="fullName" defaultValue={doctor.fullName} required />
+            <SelectField label="Gender" name="gender" options={["Male", "Female", "Other"]} defaultValue={normalizeGender(doctor.gender)} />
             <Field label="Email" name="email" type="email" defaultValue={doctor.email} />
             <Field label="Phone Number" name="phone" defaultValue={doctor.phone} />
             <Field label="Office Room" name="room" defaultValue={doctor.room || doctor.officeRoom} />
@@ -707,7 +804,7 @@ function DoctorDetailPage({ config, data, params, navigate, profile }) {
       <PageHeader config={config}>{profile.role === "administrator" ? <button className="btn primary" type="button" onClick={() => navigate("doctor-form", { id: doctor.id })}>Edit Doctor</button> : null}</PageHeader>
       <div className="panel">
         <div className="profile-header">
-          <div className="profile-main"><span className="avatar large">{initials(doctorName(doctor))}</span><div><h2>{doctorName(doctor)}</h2><p>{doctor.specialty || "-"} | {doctor.department || "-"}</p></div></div>
+          <div className="profile-main"><span className="avatar large with-photo"><img src={profileImageFor(doctor, "doctor")} alt="" /></span><div><h2>{doctorName(doctor)}</h2><p>{doctor.specialty || "-"} | {doctor.department || "-"}</p></div></div>
           {statusBadge(doctor.status || "Available")}
         </div>
       </div>
@@ -737,7 +834,7 @@ function PatientsPage({ config, data, navigate, removeRecord, profile, deletingK
           empty="No patients found."
           renderRow={(patient) => [
             patient.patientId || patient.id,
-            <Entity key="name" name={patientName(patient)} note={patient.phone || ""} />,
+            <Entity key="name" name={patientName(patient)} note={patient.phone || ""} photoUrl={profileImageFor(patient, "patient")} />,
             patient.age || ageFromDob(patient.dateOfBirth) || "-",
             patient.gender || "-",
             patient.assignedDoctorName || "-",
@@ -772,15 +869,35 @@ function PatientFormPage({ config, data, params, profile, navigate, saveRecord }
   async function handleSubmit(event) {
     event.preventDefault();
     setBusy(true);
-    const form = new FormData(event.currentTarget);
-    const payload = Object.fromEntries(form.entries());
-    const recordId = payload.id || id;
-    const doctor = data.doctors.find((item) => item.id === payload.assignedDoctorId);
-    delete payload.id;
-    payload.assignedDoctorName = doctor ? doctorName(doctor) : patient.assignedDoctorName || "";
-    payload.patientId = patient.patientId || payload.patientId || recordId || "";
-    await saveRecord("patients", payload, recordId);
-    navigate("patients");
+    try {
+      const form = new FormData(event.currentTarget);
+      const photoFile = form.get("photoFile");
+      const payload = Object.fromEntries(form.entries());
+      const recordId = payload.id || id || doc(collection(db, "clinics", clinicId, "patients")).id;
+      const doctor = data.doctors.find((item) => item.id === payload.assignedDoctorId);
+      delete payload.id;
+      delete payload.photoFile;
+      payload.gender = normalizeGender(payload.gender);
+      payload.assignedDoctorName = doctor ? doctorName(doctor) : patient.assignedDoctorName || "";
+      payload.patientId = patient.patientId || payload.patientId || recordId || "";
+
+      if (photoFile instanceof File && photoFile.size > 0) {
+        Object.assign(payload, await uploadProfilePhoto({ clinicId, collectionName: "patients", recordId, file: photoFile }));
+      } else if (!patient.photoUrl || isDefaultProfileImage(patient.photoUrl)) {
+        payload.photoUrl = defaultProfileImage("patient", payload.gender);
+      } else {
+        payload.photoUrl = patient.photoUrl;
+        if (patient.photoPath) payload.photoPath = patient.photoPath;
+      }
+
+      await saveRecord("patients", payload, recordId);
+      navigate("patients");
+    } catch (error) {
+      console.error("Patient save failed", error);
+      alert(error.message || "Could not save patient.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -790,11 +907,12 @@ function PatientFormPage({ config, data, params, profile, navigate, saveRecord }
         <form onSubmit={handleSubmit} key={patient.id || id || "new-patient"}>
           <input type="hidden" name="id" value={id} readOnly />
           <FormSection title="Personal Information">
+            <PhotoField currentUrl={patient.photoUrl} fallbackUrl={defaultProfileImage("patient", patient.gender)} />
             <Field label="First Name" name="firstName" defaultValue={patient.firstName} required />
             <Field label="Last Name" name="lastName" defaultValue={patient.lastName} required />
             <Field label="Patient ID" name="patientId" defaultValue={patient.patientId || patient.id} />
             <Field label="Date of Birth" name="dateOfBirth" type="date" defaultValue={patient.dateOfBirth} />
-            <SelectField label="Gender" name="gender" options={["Female", "Male", "Other"]} defaultValue={patient.gender} />
+            <SelectField label="Gender" name="gender" options={["Male", "Female", "Other"]} defaultValue={normalizeGender(patient.gender)} />
           </FormSection>
           <FormSection title="Contact Information">
             <Field label="Phone Number" name="phone" defaultValue={patient.phone} />
@@ -833,13 +951,13 @@ function PatientProfilePage({ config, data, params, navigate, profile }) {
       <PageHeader config={config}>{["administrator", "receptionist"].includes(profile.role) ? <button className="btn primary" type="button" onClick={() => navigate("patient-form", { id: patient.id })}>Edit Patient</button> : null}</PageHeader>
       <div className="panel">
         <div className="profile-header">
-          <div className="profile-main"><span className="avatar large">{initials(patientName(patient))}</span><div><h2>{patientName(patient)}</h2><p>{patient.patientId || patient.id} | {patient.age || ageFromDob(patient.dateOfBirth) || "-"} years | {patient.gender || "-"}</p></div></div>
+          <div className="profile-main"><span className="avatar large with-photo"><img src={profileImageFor(patient, "patient")} alt="" /></span><div><h2>{patientName(patient)}</h2><p>{patient.patientId || patient.id} | {patient.age || ageFromDob(patient.dateOfBirth) || "-"} years | {patient.gender || "-"}</p></div></div>
           {statusBadge(patient.status || "Stable")}
         </div>
       </div>
       <div className="grid two">
         <div className="panel pad"><h2 className="panel-title">Patient Information</h2><div className="info-list"><InfoRow label="Phone" value={patient.phone} /><InfoRow label="Email" value={patient.email} /><InfoRow label="Address" value={patient.address || "Not provided"} /></div></div>
-        <div className="panel pad"><h2 className="panel-title">Assigned Doctor</h2><Entity name={doctorName(doctor)} note={`${doctor.specialty || ""} ${doctor.department || ""}`} /></div>
+        <div className="panel pad"><h2 className="panel-title">Assigned Doctor</h2><Entity name={doctorName(doctor)} note={`${doctor.specialty || ""} ${doctor.department || ""}`} photoUrl={profileImageFor(doctor, "doctor")} /></div>
       </div>
     </>
   );
@@ -936,10 +1054,12 @@ function ResponsiveTable({ columns, rows, renderRow, empty }) {
   );
 }
 
-function Entity({ name, note }) {
+function Entity({ name, note, photoUrl }) {
   return (
     <div className="entity">
-      <span className="avatar">{initials(name)}</span>
+      <span className={`avatar ${photoUrl ? "with-photo" : ""}`}>
+        {photoUrl ? <img src={photoUrl} alt="" /> : initials(name)}
+      </span>
       <div><strong>{name}</strong><span>{note}</span></div>
     </div>
   );

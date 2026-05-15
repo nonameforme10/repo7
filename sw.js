@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_VERSION = "caretrack-app-v3";
+const CACHE_VERSION = "caretrack-app-v4";
 const HEALTH_PATH = "/__caretrack_health";
 const PRECACHE_ASSETS = [
   "/",
@@ -38,6 +38,9 @@ const PRECACHE_ASSETS = [
   "/assets/js/caretrack-runtime.js",
   "/assets/js/firebase-config.js",
   "/assets/img/logo.png",
+  "/assets/img/man-doc.webp",
+  "/assets/img/woman-doc.webp",
+  "/assets/img/patient.webp",
 ];
 
 function isFirebaseHost(hostname) {
