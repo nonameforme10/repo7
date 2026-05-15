@@ -579,6 +579,13 @@ button {
   padding: 22px;
 }
 
+.panel-link {
+  width: 100%;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
 .panel-header {
   display: flex;
   align-items: center;
@@ -827,6 +834,35 @@ tr:hover td {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.react-admin svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.admin-boot {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  gap: 14px;
+  color: var(--text-soft);
+  background: var(--bg);
+  font-weight: 800;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .tabs {
@@ -1307,6 +1343,26 @@ tr:hover td {
 }
 
 @media (max-width: 1180px) {
+  :root {
+    --sidebar-width: 232px;
+  }
+
+  .sidebar {
+    padding-inline: 12px;
+  }
+
+  .nav-link {
+    font-size: 13px;
+  }
+
+  .topbar {
+    padding-inline: 20px;
+  }
+
+  .content {
+    padding: 24px;
+  }
+
   .grid.stats,
   .grid.three {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1320,6 +1376,52 @@ tr:hover td {
 
   .auth-brand {
     min-height: 460px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .responsive-table {
+    min-width: 0;
+  }
+
+  .responsive-table thead {
+    display: none;
+  }
+
+  .responsive-table,
+  .responsive-table tbody,
+  .responsive-table tr,
+  .responsive-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .responsive-table tr {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .responsive-table tr:last-child {
+    border-bottom: 0;
+  }
+
+  .responsive-table td {
+    display: grid;
+    grid-template-columns: minmax(108px, 34%) minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 0;
+    white-space: normal;
+  }
+
+  .responsive-table td::before {
+    content: attr(data-label);
+    color: var(--faint);
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
 }
 
@@ -1367,6 +1469,7 @@ tr:hover td {
   .head-actions,
   .form-actions {
     justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
   .form-grid,
@@ -1389,5 +1492,28 @@ tr:hover td {
   .auth-brand,
   .auth-card-wrap {
     padding: 26px 16px;
+  }
+}
+
+@media (max-width: 560px) {
+  .topbar {
+    gap: 10px;
+  }
+
+  .global-search {
+    display: none;
+  }
+
+  .topbar-actions {
+    gap: 8px;
+  }
+
+  .page-title {
+    font-size: 26px;
+  }
+
+  .responsive-table td {
+    grid-template-columns: 1fr;
+    gap: 5px;
   }
 }

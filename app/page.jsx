@@ -50,7 +50,7 @@ export default function HomePage() {
         <a className="ct-logo ct-logo-full" href="/" aria-label="CareTrack">
           <img className="ct-logo-image" src="/assets/img/logo.png" width="168" height="64" alt="CareTrack" />
         </a>
-        <a className="btn primary" href="/auth/index.html">
+        <a className="btn primary" href="/auth">
           Staff Login
         </a>
       </nav>
@@ -64,7 +64,7 @@ export default function HomePage() {
             and role-based access from one secure healthcare dashboard.
           </p>
           <div className="hero-actions">
-            <a className="btn primary" href="/auth/index.html">
+            <a className="btn primary" href="/auth">
               <LockIcon />
               Staff Login
             </a>

@@ -1,11 +1,21 @@
 "use strict";
 
-const CACHE_VERSION = "caretrack-app-v2";
+const CACHE_VERSION = "caretrack-app-v3";
 const HEALTH_PATH = "/__caretrack_health";
 const PRECACHE_ASSETS = [
   "/",
   "/index.html",
+  "/auth",
   "/auth/index.html",
+  "/admin",
+  "/admin/doctors",
+  "/admin/patients",
+  "/admin/diagnoses",
+  "/admin/reports",
+  "/admin/schedules",
+  "/admin/users",
+  "/admin/settings",
+  "/admin/audit",
   "/admin/access-denied.html",
   "/admin/admin.html",
   "/admin/audit-logs.html",

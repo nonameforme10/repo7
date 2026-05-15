@@ -15,12 +15,6 @@ const port = Number(process.env.PORT || 4173);
 const nextApp = next({ dev, hostname, port });
 const handle = nextApp.getRequestHandler();
 
-function noStoreHtml(res, filePath) {
-  if (filePath.endsWith(".html")) {
-    res.setHeader("Cache-Control", "no-store");
-  }
-}
-
 nextApp.prepare().then(() => {
   const server = express();
 
@@ -42,18 +36,6 @@ nextApp.prepare().then(() => {
   server.use("/assets", express.static(path.join(rootDir, "assets"), {
     etag: true,
     maxAge: "1h",
-  }));
-
-  server.use("/admin", express.static(path.join(rootDir, "admin"), {
-    etag: true,
-    maxAge: 0,
-    setHeaders: noStoreHtml,
-  }));
-
-  server.use("/auth", express.static(path.join(rootDir, "auth"), {
-    etag: true,
-    maxAge: 0,
-    setHeaders: noStoreHtml,
   }));
 
   server.use("/sw.js", express.static(path.join(rootDir, "sw.js"), {
