@@ -691,6 +691,11 @@ button {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.grid + .panel,
+.panel + .panel {
+  margin-top: 18px;
+}
+
 .panel {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -914,6 +919,14 @@ th {
 td {
   color: var(--text-soft);
   font-size: 14px;
+}
+
+.table-note {
+  display: block;
+  min-width: 180px;
+  max-width: 360px;
+  white-space: normal;
+  line-height: 1.45;
 }
 
 .table-select {

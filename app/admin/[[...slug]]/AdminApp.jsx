@@ -415,6 +415,15 @@ function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function diagnosisNotes(diagnosis = {}) {
+  return diagnosis.clinicalNotes || diagnosis.notes || diagnosis.criticalNotes || "";
+}
+
+function diagnosisFindings(diagnosis = {}) {
+  if (Array.isArray(diagnosis.clinicalFindings)) return diagnosis.clinicalFindings.join(", ");
+  return diagnosis.findingsText || "";
+}
+
 function buildScheduleRows(schedules = [], doctors = [], patients = []) {
   const rows = [];
   const explicitDoctorIds = new Set();
@@ -996,7 +1005,7 @@ function AdminPage({ page, config, params, profile, navigate, notify }) {
   if (page === "patient-profile") return <PatientProfilePage config={config} {...common} />;
   if (page === "diagnoses") return <DiagnosesPage config={config} {...common} />;
   if (page === "diagnosis-form") return <DiagnosisFormPage config={config} {...common} />;
-  if (page === "reports") return <SimpleRecordsPage config={config} collection="diagnoses" title="Diagnosis Reports" rows={data.diagnoses} columns={["patientName", "description", "severity", "diagnosisDate"]} />;
+  if (page === "reports") return <ReportsPage config={config} data={data} />;
   if (page === "schedules") return <SchedulesPage config={config} data={data} />;
   if (page === "users") return <StaffUsersPage config={config} users={data.users} profile={profile} notify={notify} />;
   if (page === "settings") return <SettingsPage config={config} notify={notify} />;
@@ -1424,6 +1433,12 @@ function PatientProfilePage({ config, data, params, navigate, profile }) {
   const patient = data.patients.find((item) => recordId(item) === id) || data.patients[0] || {};
   const patientDocId = recordId(patient);
   const doctor = data.doctors.find((item) => recordId(item) === patient.assignedDoctorId || doctorName(item) === patient.assignedDoctorName) || {};
+  const patientDiagnoses = data.diagnoses.filter((item) => (
+    item.patientId === patientDocId
+    || item.patientId === patient.patientId
+    || item.patientPublicId === patient.patientId
+    || item.patientName === patientName(patient)
+  ));
 
   return (
     <>
@@ -1441,6 +1456,21 @@ function PatientProfilePage({ config, data, params, navigate, profile }) {
         <div className="panel pad"><h2 className="panel-title">Patient Information</h2><div className="info-list"><InfoRow label="Phone" value={patient.phone} /><InfoRow label="Email" value={patient.email} /><InfoRow label="Address" value={patient.address || "Not provided"} /></div></div>
         <div className="panel pad"><h2 className="panel-title">Assigned Doctor</h2><Entity name={doctorName(doctor)} note={`${doctor.specialty || ""} ${doctor.department || ""}`} photoUrl={profileImageFor(doctor, "doctor")} /></div>
       </div>
+      <div className="panel">
+        <div className="panel-header"><h2 className="panel-title">Diagnosis Notes</h2></div>
+        <ResponsiveTable
+          columns={["Diagnosis", "Findings", "Clinical Notes", "Severity", "Date"]}
+          rows={patientDiagnoses}
+          empty="No diagnosis notes yet."
+          renderRow={(item) => [
+            item.description || "-",
+            <span className="table-note" key="findings">{diagnosisFindings(item) || "-"}</span>,
+            <span className="table-note" key="notes">{diagnosisNotes(item) || "-"}</span>,
+            statusBadge(item.severity || "Medium"),
+            item.diagnosisDate || "-",
+          ]}
+        />
+      </div>
     </>
   );
 }
@@ -1453,13 +1483,15 @@ function DiagnosesPage({ config, data, navigate, removeRecord, profile, deleting
       <PageHeader config={config}>{canAdd ? <button className="btn primary" type="button" onClick={() => navigate("diagnosis-form")}>{icons.plus} Add Diagnosis</button> : null}</PageHeader>
       <div className="panel">
         <ResponsiveTable
-          columns={["ICD", "Patient", "Diagnosis", "Clinician", "Severity", "Date", "Actions"]}
+          columns={["ICD", "Patient", "Diagnosis", "Findings", "Clinical Notes", "Clinician", "Severity", "Date", "Actions"]}
           rows={data.diagnoses}
           empty="No diagnoses found."
           renderRow={(item) => [
             item.icdCode || "-",
             item.patientName || item.patientId || "-",
             item.description || "-",
+            <span className="table-note" key="findings">{diagnosisFindings(item) || "-"}</span>,
+            <span className="table-note" key="notes">{diagnosisNotes(item) || "-"}</span>,
             item.assignedDoctorName || "-",
             statusBadge(item.severity || "Medium"),
             item.diagnosisDate || "-",
@@ -1809,6 +1841,42 @@ function SchedulesPage({ config, data }) {
             row.room || "-",
             row.assignedPatients || "0",
             statusBadge(row.status || "Available"),
+          ]}
+        />
+      </div>
+    </>
+  );
+}
+
+function ReportsPage({ config, data }) {
+  const [search, setSearch] = useState("");
+  const rows = useMemo(() => {
+    const term = search.toLowerCase();
+    return data.diagnoses.filter((item) => `${item.patientName || ""} ${item.description || ""} ${diagnosisNotes(item)} ${diagnosisFindings(item)} ${item.severity || ""}`.toLowerCase().includes(term));
+  }, [data.diagnoses, search]);
+
+  return (
+    <>
+      <PageHeader config={config} />
+      <div className="toolbar">
+        <div className="search-field">
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search reports by patient, diagnosis, findings, or notes" />
+        </div>
+      </div>
+      <div className="panel">
+        <div className="panel-header"><h2 className="panel-title">Diagnosis Reports</h2></div>
+        <ResponsiveTable
+          columns={["Patient Name", "Description", "Findings", "Clinical Notes", "Severity", "Patient Status", "Diagnosis Date"]}
+          rows={rows}
+          empty="No diagnosis reports found."
+          renderRow={(item) => [
+            item.patientName || item.patientId || "-",
+            item.description || "-",
+            <span className="table-note" key="findings">{diagnosisFindings(item) || "-"}</span>,
+            <span className="table-note" key="notes">{diagnosisNotes(item) || "-"}</span>,
+            statusBadge(item.severity || "Medium"),
+            statusBadge(item.patientStatus || item.status || "Monitoring"),
+            item.diagnosisDate || "-",
           ]}
         />
       </div>

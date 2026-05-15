@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_VERSION = "v10";
+const CACHE_VERSION = "v11";
 const HEALTH_PATHS = new Set(["/__caretrack_health", "/_caretrack_health"]);
 const PRECACHE_ASSETS = [
   "/",
