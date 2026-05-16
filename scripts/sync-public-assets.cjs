@@ -9,6 +9,7 @@ const sourceAssetsDir = path.join(rootDir, "assets");
 const publicAssetsDir = path.join(publicDir, "assets");
 const sourceServiceWorker = path.join(rootDir, "sw.js");
 const publicServiceWorker = path.join(publicDir, "sw.js");
+const rootPublicFiles = ["robots.txt", "sitemap.xml"];
 
 function assertInside(target, parent) {
   const relative = path.relative(parent, target);
@@ -27,10 +28,17 @@ requirePath(sourceAssetsDir);
 requirePath(sourceServiceWorker);
 assertInside(publicAssetsDir, publicDir);
 assertInside(publicServiceWorker, publicDir);
+for (const fileName of rootPublicFiles) {
+  requirePath(path.join(rootDir, fileName));
+  assertInside(path.join(publicDir, fileName), publicDir);
+}
 
 fs.mkdirSync(publicDir, { recursive: true });
 fs.rmSync(publicAssetsDir, { recursive: true, force: true });
 fs.cpSync(sourceAssetsDir, publicAssetsDir, { recursive: true });
 fs.copyFileSync(sourceServiceWorker, publicServiceWorker);
+for (const fileName of rootPublicFiles) {
+  fs.copyFileSync(path.join(rootDir, fileName), path.join(publicDir, fileName));
+}
 
-console.log("Synced assets/ and sw.js into public/ for Next/Vercel.");
+console.log("Synced assets/, sw.js, robots.txt, and sitemap.xml into public/ for Next/Vercel.");

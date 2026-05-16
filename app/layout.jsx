@@ -2,6 +2,7 @@ import Script from "next/script";
 import "../assets/css/caretrack.css";
 
 export const metadata = {
+  metadataBase: new URL("https://caretrack.website"),
   title: "CareTrack - Secure Medical Records Management",
   description: "CareTrack is a secure medical records management system for authorized clinic staff.",
   icons: {

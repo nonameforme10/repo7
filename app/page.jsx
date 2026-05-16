@@ -24,6 +24,65 @@ const features = [
   },
 ];
 
+const siteDescription = "CareTrack is a secure medical records management system for authorized clinic staff.";
+const structuredData = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://caretrack.website/#website",
+      name: "CareTrack",
+      url: "https://caretrack.website/",
+      description: siteDescription,
+      inLanguage: "en",
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://caretrack.website/#software",
+      name: "CareTrack",
+      applicationCategory: "HealthApplication",
+      operatingSystem: "Web",
+      url: "https://caretrack.website/",
+      description: siteDescription,
+      audience: {
+        "@type": "Audience",
+        audienceType: "Authorized clinic staff",
+      },
+    },
+  ],
+};
+
+export const metadata = {
+  title: "CareTrack - Secure Medical Records Management",
+  description: siteDescription,
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "CareTrack - Secure Medical Records Management",
+    description: siteDescription,
+    url: "/",
+    siteName: "CareTrack",
+    type: "website",
+    images: [
+      {
+        url: "/assets/img/logo.png",
+        alt: "CareTrack logo",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "CareTrack - Secure Medical Records Management",
+    description: siteDescription,
+    images: ["/assets/img/logo.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
+
 function LockIcon() {
   return (
     <svg
@@ -46,6 +105,10 @@ function LockIcon() {
 export default function HomePage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, "\\u003c") }}
+      />
       <nav className="public-nav">
         <a className="ct-logo ct-logo-full" href="/" aria-label="CareTrack">
           <img className="ct-logo-image" src="/assets/img/logo.png" width="168" height="64" alt="CareTrack" />
