@@ -3,29 +3,20 @@
     "**/.next": true,
     "**/.vercel": true,
     "**/test-results": true,
-    "**/playwright-report": true,
-    "public/assets": true,
-    "public/sw.js": true,
-    "public/robots.txt": true,
-    "public/sitemap.xml": true
+    "**/playwright-report": true
   },
   "search.exclude": {
     "**/.next": true,
     "**/.vercel": true,
     "**/node_modules": true,
     "**/test-results": true,
-    "**/playwright-report": true,
-    "public/assets": true,
-    "public/sw.js": true,
-    "public/robots.txt": true,
-    "public/sitemap.xml": true
+    "**/playwright-report": true
   },
   "files.watcherExclude": {
     "**/.next/**": true,
     "**/.vercel/**": true,
     "**/node_modules/**": true,
     "**/test-results/**": true,
-    "**/playwright-report/**": true,
-    "**/public/assets/**": true
+    "**/playwright-report/**": true
   }
 }

@@ -3,27 +3,28 @@
 const {auth, rtdb, RtdServerValue} = require("./firebase");
 
 const DEFAULT_CLINIC_ID = "default";
-const STAFF_TYPES = new Set(["admin", "doctor", "nurse", "reception"]);
+const STAFF_TYPES = new Set(["admin", "doctor", "receptionist"]);
 
 function normalizeStaffType(value) {
   const staffType = String(value || "").toLowerCase().trim();
   if (STAFF_TYPES.has(staffType)) return staffType;
   if (staffType === "administrator") return "admin";
   if (["clinician", "clinical"].includes(staffType)) return "doctor";
-  if (["receptionist", "frontdesk", "front_desk"].includes(staffType)) return "reception";
+  if (["reception", "frontdesk", "front_desk"].includes(staffType)) return "receptionist";
   return "doctor";
 }
 
 function roleForStaffType(staffType) {
-  if (staffType === "admin") return "administrator";
-  if (staffType === "reception") return "receptionist";
-  return "clinician";
+  const cleanStaffType = normalizeStaffType(staffType);
+  if (cleanStaffType === "admin") return "admin";
+  if (cleanStaffType === "receptionist") return "receptionist";
+  return "doctor";
 }
 
 function registrationPath(uid, staffType) {
-  if (staffType === "admin") return `registration/admin/${uid}`;
-  if (staffType === "reception") return `registration/receptionist/${uid}`;
-  if (staffType === "nurse") return `registration/nurses/${uid}`;
+  const cleanStaffType = normalizeStaffType(staffType);
+  if (cleanStaffType === "admin") return `registration/admin/${uid}`;
+  if (cleanStaffType === "receptionist") return `registration/receptionist/${uid}`;
   return `registration/doctors/${uid}`;
 }
 
@@ -32,10 +33,15 @@ function registrationPaths(uid) {
     `registration/admin/${uid}`,
     `registration/doctors/${uid}`,
     `registration/receptionist/${uid}`,
-    `registration/nurses/${uid}`,
     `registration/clinicks/doctor/${uid}`,
-    `registration/clinicks/nurse/${uid}`,
     `registration/clinicks/reception/${uid}`,
+  ];
+}
+
+function legacyRegistrationPaths(uid) {
+  return [
+    `registration/nurses/${uid}`,
+    `registration/clinicks/nurse/${uid}`,
   ];
 }
 
@@ -43,8 +49,7 @@ function staffTypeFromPath(path) {
   const parts = String(path || "").split("/");
   if (parts[1] === "admin") return "admin";
   if (parts[1] === "doctors") return "doctor";
-  if (parts[1] === "receptionist") return "reception";
-  if (parts[1] === "nurses") return "nurse";
+  if (parts[1] === "receptionist") return "receptionist";
   return normalizeStaffType(parts[2]);
 }
 
@@ -67,11 +72,9 @@ async function listRegistrations() {
   const groups = [
     ["admin", "registration/admin"],
     ["doctor", "registration/doctors"],
-    ["reception", "registration/receptionist"],
-    ["nurse", "registration/nurses"],
+    ["receptionist", "registration/receptionist"],
     ["doctor", "registration/clinicks/doctor"],
-    ["reception", "registration/clinicks/reception"],
-    ["nurse", "registration/clinicks/nurse"],
+    ["receptionist", "registration/clinicks/reception"],
   ];
   const usersByUid = new Map();
 
@@ -86,9 +89,9 @@ async function listRegistrations() {
         uid,
         id: uid,
         path: `${path}/${uid}`,
+        ...value,
         role: roleForStaffType(cleanStaffType),
         staffType: cleanStaffType,
-        ...value,
       });
     });
   }
@@ -102,7 +105,7 @@ async function listRegistrations() {
 
 async function removeOldRegistration(uid) {
   const updates = {};
-  registrationPaths(uid).forEach((path) => {
+  [...registrationPaths(uid), ...legacyRegistrationPaths(uid)].forEach((path) => {
     updates[path] = null;
   });
   await rtdb.ref().update(updates);

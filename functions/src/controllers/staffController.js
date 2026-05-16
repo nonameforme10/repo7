@@ -179,7 +179,7 @@ async function disableStaffUser(request) {
     throw new HttpsError("invalid-argument", "Staff uid is required.");
   }
   if (uid === adminUser.uid) {
-    throw new HttpsError("failed-precondition", "Administrators cannot disable their own account.");
+    throw new HttpsError("failed-precondition", "Admins cannot disable their own account.");
   }
 
   const userRecord = await getAuthUserByUid(uid);

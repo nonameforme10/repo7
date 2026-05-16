@@ -1,6 +1,5 @@
 {
   "scripts": {
-    "prebuild": "node scripts/sync-public-assets.cjs",
     "dev": "node server.js --dev",
     "build": "next build",
     "start": "node server.js",

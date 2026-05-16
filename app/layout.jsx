@@ -1,5 +1,4 @@
 import Script from "next/script";
-import "../assets/css/caretrack.css";
 
 export const metadata = {
   metadataBase: new URL("https://caretrack.website"),
@@ -19,6 +18,9 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="stylesheet" href="/assets/css/caretrack.css" />
+      </head>
       <body className="public-page">
         {children}
         <Script src="/assets/js/caretrack-runtime.js" strategy="afterInteractive" />

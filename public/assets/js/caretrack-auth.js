@@ -33,9 +33,7 @@ function registrationPaths(uid) {
     `registration/admin/${uid}`,
     `registration/doctors/${uid}`,
     `registration/receptionist/${uid}`,
-    `registration/nurses/${uid}`,
     `registration/clinicks/doctor/${uid}`,
-    `registration/clinicks/nurse/${uid}`,
     `registration/clinicks/reception/${uid}`,
   ];
 }
@@ -86,7 +84,7 @@ form?.addEventListener("submit", async (event) => {
 
     if (registration.value.active !== true && registration.value.status !== "active") {
       await signOut(auth);
-      showError("This staff account is disabled. Contact the clinic administrator.");
+      showError("This staff account is disabled. Contact the clinic admin.");
       return;
     }
 

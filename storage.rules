@@ -17,11 +17,11 @@ service firebase.storage {
     }
 
     function isAdmin(clinic) {
-      return inClinic(clinic) && request.auth.token.role == "administrator";
+      return inClinic(clinic) && request.auth.token.role == "admin";
     }
 
-    function isClinician(clinic) {
-      return inClinic(clinic) && request.auth.token.role == "clinician";
+    function isDoctor(clinic) {
+      return inClinic(clinic) && request.auth.token.role == "doctor";
     }
 
     function isReceptionist(clinic) {
@@ -30,7 +30,7 @@ service firebase.storage {
 
     match /clinics/{clinic}/patients/{patientId}/{allPaths=**} {
       allow read: if inClinic(clinic);
-      allow write: if isAdmin(clinic) || isClinician(clinic) || isReceptionist(clinic);
+      allow write: if isAdmin(clinic) || isDoctor(clinic) || isReceptionist(clinic);
     }
 
     match /clinics/{clinic}/doctors/{doctorId}/{allPaths=**} {
@@ -39,8 +39,8 @@ service firebase.storage {
     }
 
     match /clinics/{clinic}/reports/{allPaths=**} {
-      allow read: if inClinic(clinic);
-      allow write: if isAdmin(clinic) || isClinician(clinic);
+      allow read: if isAdmin(clinic) || isDoctor(clinic);
+      allow write: if isAdmin(clinic) || isDoctor(clinic);
     }
 
     match /{allPaths=**} {

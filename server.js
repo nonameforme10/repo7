@@ -24,6 +24,7 @@ const apiAllowedOrigins = new Set(
     .map((origin) => origin.trim())
     .filter(Boolean),
 );
+const publicDir = path.join(rootDir, "public");
 
 const nextApp = next({ dev, hostname, port });
 const handle = nextApp.getRequestHandler();
@@ -63,7 +64,7 @@ nextApp.prepare().then(() => {
 
   server.get("/favicon.ico", (_req, res) => {
     res.setHeader("Cache-Control", "public, max-age=2592000");
-    res.type("png").sendFile(path.join(rootDir, "assets", "img", "logo.png"));
+    res.type("png").sendFile(path.join(publicDir, "assets", "img", "logo.png"));
   });
 
   server.get("/api/health", (_req, res) => {
@@ -97,12 +98,22 @@ nextApp.prepare().then(() => {
 
   server.get("/index.html", (req, res) => nextApp.render(req, res, "/"));
 
-  server.use("/assets/img", express.static(path.join(rootDir, "assets", "img"), {
+  server.get("/robots.txt", (_req, res) => {
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.type("text/plain").sendFile(path.join(rootDir, "robots.txt"));
+  });
+
+  server.get("/sitemap.xml", (_req, res) => {
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.type("application/xml").sendFile(path.join(rootDir, "sitemap.xml"));
+  });
+
+  server.use("/assets/img", express.static(path.join(publicDir, "assets", "img"), {
     immutable: true,
     maxAge: "30d",
   }));
 
-  server.use("/assets", express.static(path.join(rootDir, "assets"), {
+  server.use("/assets", express.static(path.join(publicDir, "assets"), {
     etag: true,
     maxAge: "1h",
   }));

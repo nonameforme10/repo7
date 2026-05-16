@@ -25,11 +25,11 @@ service cloud.firestore {
     }
 
     function isAdmin(clinic) {
-      return inClinic(clinic) && role() == "administrator";
+      return inClinic(clinic) && role() == "admin";
     }
 
-    function isClinician(clinic) {
-      return inClinic(clinic) && role() == "clinician";
+    function isDoctor(clinic) {
+      return inClinic(clinic) && role() == "doctor";
     }
 
     function isReceptionist(clinic) {
@@ -37,7 +37,7 @@ service cloud.firestore {
     }
 
     function isClinicStaff(clinic) {
-      return isAdmin(clinic) || isClinician(clinic) || isReceptionist(clinic);
+      return isAdmin(clinic) || isDoctor(clinic) || isReceptionist(clinic);
     }
 
     function changedOnly(allowed) {
@@ -60,9 +60,9 @@ service cloud.firestore {
 
       match /patients/{patientId} {
         allow read: if isClinicStaff(clinic);
-        allow create: if isAdmin(clinic) || isClinician(clinic) || isReceptionist(clinic);
+        allow create: if isAdmin(clinic) || isDoctor(clinic) || isReceptionist(clinic);
         allow update: if isAdmin(clinic)
-          || ((isClinician(clinic) || isReceptionist(clinic)) && changedOnly([
+          || ((isDoctor(clinic) || isReceptionist(clinic)) && changedOnly([
             "firstName", "lastName", "dateOfBirth", "age", "gender",
             "patientId", "phone", "email", "address", "emergencyContactName",
             "emergencyContactPhone", "assignedDoctorId", "assignedDoctorName",
@@ -73,8 +73,8 @@ service cloud.firestore {
       }
 
       match /diagnoses/{diagnosisId} {
-        allow read: if isClinicStaff(clinic);
-        allow create, update: if isAdmin(clinic) || isClinician(clinic);
+        allow read: if isAdmin(clinic) || isDoctor(clinic);
+        allow create, update: if isAdmin(clinic) || isDoctor(clinic);
         allow delete: if isAdmin(clinic);
       }
 
@@ -84,8 +84,8 @@ service cloud.firestore {
       }
 
       match /reports/{reportId} {
-        allow read: if isClinicStaff(clinic);
-        allow create: if isClinicStaff(clinic);
+        allow read: if isAdmin(clinic) || isDoctor(clinic);
+        allow create: if isAdmin(clinic) || isDoctor(clinic);
         allow update, delete: if isAdmin(clinic);
       }
 

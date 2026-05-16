@@ -20,7 +20,7 @@ const features = [
   },
   {
     title: "Role-Based Security",
-    body: "Administrator, clinician, doctor, nurse, and receptionist access is controlled through Firebase Auth and RTD registration.",
+    body: "Admin, doctor, and receptionist access is controlled through Firebase Auth and RTD registration.",
   },
 ];
 
@@ -139,7 +139,7 @@ export default function HomePage() {
 
         <section className="hero-dashboard" aria-label="CareTrack dashboard preview">
           <div className="hero-dashboard-top">
-            <span className="badge cyan">Administrator</span>
+            <span className="badge cyan">Admin</span>
             <span className="badge green">Secure Access</span>
           </div>
           <div className="hero-dashboard-body">

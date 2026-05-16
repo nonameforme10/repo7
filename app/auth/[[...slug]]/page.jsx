@@ -25,9 +25,7 @@ function registrationPaths(uid) {
     `registration/admin/${uid}`,
     `registration/doctors/${uid}`,
     `registration/receptionist/${uid}`,
-    `registration/nurses/${uid}`,
     `registration/clinicks/doctor/${uid}`,
-    `registration/clinicks/nurse/${uid}`,
     `registration/clinicks/reception/${uid}`,
   ];
 }
@@ -89,7 +87,7 @@ export default function AuthPage() {
 
       if (registration.value.active !== true && registration.value.status !== "active") {
         await signOut(auth);
-        setMessage("This staff account is disabled. Contact the clinic administrator.");
+        setMessage("This staff account is disabled. Contact the clinic admin.");
         return;
       }
 

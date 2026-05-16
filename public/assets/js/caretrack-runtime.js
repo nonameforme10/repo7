@@ -2,11 +2,11 @@
   "use strict";
 
   const CHECK_URL = "/__caretrack_health";
-  const SW_URL = "/sw.js";
   const ONLINE_INTERVAL_MS = 60000;
   const OFFLINE_INTERVAL_MS = 10000;
   const CHECK_TIMEOUT_MS = 3500;
   const scriptUrl = document.currentScript?.src || `${window.location.origin}/assets/js/caretrack-runtime.js`;
+  const SW_URL = "/sw.js";
   const logoUrl = new URL("../img/logo.png", scriptUrl).href;
 
   const runtime = {

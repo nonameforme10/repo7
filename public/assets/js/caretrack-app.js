@@ -25,8 +25,10 @@ import {
 
 const html = String.raw;
 const root = document.getElementById("app-root") || document.body;
-const pageKey = document.body.dataset.page || "dashboard";
-const APP_LOGO_URL = "../assets/img/logo.png";
+const rawPageKey = document.body.dataset.page || "dashboard";
+const pageKey = rawPageKey === "users" ? "doctors" : rawPageKey;
+const assetBaseUrl = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const APP_LOGO_URL = `${assetBaseUrl}/img/logo.png`;
 
 const state = {
   user: null,
@@ -36,16 +38,9 @@ const state = {
 };
 
 const roleLabels = {
-  administrator: "Administrator",
-  clinician: "Clinician",
-  receptionist: "Receptionist",
-};
-
-const staffTypeLabels = {
-  admin: "Administrator",
+  admin: "Admin",
   doctor: "Doctor",
-  nurse: "Nurse",
-  reception: "Reception",
+  receptionist: "Receptionist",
 };
 
 const icons = {
@@ -70,33 +65,31 @@ const icons = {
 };
 
 const nav = [
-  { key: "dashboard", href: "admin.html", label: "Dashboard", icon: "chart", roles: ["administrator", "clinician", "receptionist"], group: "Main" },
-  { key: "doctors", href: "doctors.html", label: "Doctors", icon: "user", roles: ["administrator", "clinician", "receptionist"], group: "Main" },
-  { key: "patients", href: "patients.html", label: "Patients", icon: "users", roles: ["administrator", "clinician", "receptionist"], group: "Main" },
-  { key: "diagnoses", href: "diagnoses.html", label: "Diagnoses", icon: "activity", roles: ["administrator", "clinician", "receptionist"], group: "Main" },
-  { key: "reports", href: "reports.html", label: "Reports", icon: "document", roles: ["administrator", "clinician", "receptionist"], group: "Main" },
-  { key: "schedules", href: "schedules.html", label: "Schedules", icon: "calendar", roles: ["administrator", "clinician", "receptionist"], group: "Main" },
-  { key: "users", href: "users.html", label: "User Management", icon: "shield", roles: ["administrator"], group: "System" },
-  { key: "settings", href: "settings.html", label: "Settings", icon: "settings", roles: ["administrator"], group: "System" },
-  { key: "audit", href: "audit-logs.html", label: "Audit Logs", icon: "audit", roles: ["administrator"], group: "System" },
+  { key: "dashboard", href: "admin.html", label: "Dashboard", icon: "chart", roles: ["admin", "doctor", "receptionist"], group: "Main" },
+  { key: "doctors", href: "doctors.html", label: "Staff", icon: "users", roles: ["admin", "doctor", "receptionist"], group: "Main" },
+  { key: "patients", href: "patients.html", label: "Patients", icon: "users", roles: ["admin", "doctor", "receptionist"], group: "Main" },
+  { key: "diagnoses", href: "diagnoses.html", label: "Diagnoses", icon: "activity", roles: ["admin", "doctor"], group: "Main" },
+  { key: "reports", href: "reports.html", label: "Reports", icon: "document", roles: ["admin", "doctor"], group: "Main" },
+  { key: "schedules", href: "schedules.html", label: "Schedules", icon: "calendar", roles: ["admin", "doctor", "receptionist"], group: "Main" },
+  { key: "settings", href: "settings.html", label: "Settings", icon: "settings", roles: ["admin"], group: "System" },
+  { key: "audit", href: "audit-logs.html", label: "Audit Logs", icon: "audit", roles: ["admin"], group: "System" },
 ];
 
 const pages = {
-  dashboard: { nav: "dashboard", title: "Dashboard", subtitle: "Clinic operations, records, and alerts at a glance.", roles: ["administrator", "clinician", "receptionist"], render: renderDashboard },
-  doctors: { nav: "doctors", title: "Doctors", subtitle: "Manage doctor profiles, departments, and contact details.", roles: ["administrator", "clinician", "receptionist"], render: renderDoctors },
-  "doctor-form": { nav: "doctors", title: "Add Doctor", subtitle: "Create or update clinician profile, specialty, contact, and availability.", roles: ["administrator"], render: renderDoctorForm },
-  "doctor-detail": { nav: "doctors", title: "Doctor Profile", subtitle: "Review doctor details, assigned patients, schedule, and activity.", roles: ["administrator", "clinician", "receptionist"], render: renderDoctorDetail },
-  patients: { nav: "patients", title: "Patients", subtitle: "View, register, and manage patient records.", roles: ["administrator", "clinician", "receptionist"], render: renderPatients },
-  "patient-form": { nav: "patients", title: "Register New Patient", subtitle: "Register patient information and assign the right clinical care team.", roles: ["administrator", "clinician", "receptionist"], render: renderPatientForm },
-  "patient-profile": { nav: "patients", title: "Patient Profile", subtitle: "Full medical record overview and linked diagnosis history.", roles: ["administrator", "clinician", "receptionist"], render: renderPatientProfile },
-  diagnoses: { nav: "diagnoses", title: "Diagnoses", subtitle: "Manage patient disease and diagnosis records.", roles: ["administrator", "clinician", "receptionist"], render: renderDiagnoses },
-  "diagnosis-form": { nav: "diagnoses", title: "Add Diagnosis Record", subtitle: "Create or update a diagnosis linked to a patient profile.", roles: ["administrator", "clinician"], render: renderDiagnosisForm },
-  reports: { nav: "reports", title: "Reports", subtitle: "Generate and review patient diagnosis reports.", roles: ["administrator", "clinician", "receptionist"], render: renderReports },
-  "patient-report": { nav: "reports", title: "Patient Diagnosis Report", subtitle: "Printable patient diagnosis history and clinical notes.", roles: ["administrator", "clinician", "receptionist"], render: renderPatientReport },
-  schedules: { nav: "schedules", title: "Doctor Schedules", subtitle: "View doctor availability and working hours.", roles: ["administrator", "clinician", "receptionist"], render: renderSchedules },
-  users: { nav: "users", title: "User Management", subtitle: "Manage clinic staff accounts and role-based access.", roles: ["administrator"], render: renderUsers },
-  settings: { nav: "settings", title: "System Settings", subtitle: "Configure clinic profile, departments, specialties, and security defaults.", roles: ["administrator"], render: renderSettings },
-  audit: { nav: "audit", title: "Audit Logs", subtitle: "Track important actions performed in the medical records system.", roles: ["administrator"], render: renderAuditLogs },
+  dashboard: { nav: "dashboard", title: "Dashboard", subtitle: "Clinic operations, records, and alerts at a glance.", roles: ["admin", "doctor", "receptionist"], render: renderDashboard },
+  doctors: { nav: "doctors", title: "Staff", subtitle: "Find doctors and receptionists by name, role, department, email, or contact details.", roles: ["admin", "doctor", "receptionist"], render: renderDoctors },
+  "doctor-form": { nav: "doctors", title: "Add Doctor", subtitle: "Create or update doctor profile, specialty, contact, and availability.", roles: ["admin"], render: renderDoctorForm },
+  "doctor-detail": { nav: "doctors", title: "Doctor Profile", subtitle: "Review doctor details, assigned patients, schedule, and activity.", roles: ["admin", "doctor", "receptionist"], render: renderDoctorDetail },
+  patients: { nav: "patients", title: "Patients", subtitle: "View, register, and manage patient records.", roles: ["admin", "doctor", "receptionist"], render: renderPatients },
+  "patient-form": { nav: "patients", title: "Register New Patient", subtitle: "Register patient information and assign the right clinical care team.", roles: ["admin", "doctor", "receptionist"], render: renderPatientForm },
+  "patient-profile": { nav: "patients", title: "Patient Profile", subtitle: "Full medical record overview and linked diagnosis history.", roles: ["admin", "doctor", "receptionist"], render: renderPatientProfile },
+  diagnoses: { nav: "diagnoses", title: "Diagnoses", subtitle: "Manage patient disease and diagnosis records.", roles: ["admin", "doctor"], render: renderDiagnoses },
+  "diagnosis-form": { nav: "diagnoses", title: "Add Diagnosis Record", subtitle: "Create or update a diagnosis linked to a patient profile.", roles: ["admin", "doctor"], render: renderDiagnosisForm },
+  reports: { nav: "reports", title: "Reports", subtitle: "Generate and review patient diagnosis reports.", roles: ["admin", "doctor"], render: renderReports },
+  "patient-report": { nav: "reports", title: "Patient Diagnosis Report", subtitle: "Printable patient diagnosis history and clinical notes.", roles: ["admin", "doctor"], render: renderPatientReport },
+  schedules: { nav: "schedules", title: "Doctor Schedules", subtitle: "View doctor availability and working hours.", roles: ["admin", "doctor", "receptionist"], render: renderSchedules },
+  settings: { nav: "settings", title: "System Settings", subtitle: "Configure clinic profile, departments, specialties, and security defaults.", roles: ["admin"], render: renderSettings },
+  audit: { nav: "audit", title: "Audit Logs", subtitle: "Track important actions performed in the medical records system.", roles: ["admin"], render: renderAuditLogs },
   "access-denied": { nav: null, title: "Access Denied", subtitle: "You do not have permission to view this page.", roles: [], render: renderAccessDenied },
 };
 
@@ -126,12 +119,12 @@ const samples = {
     { id: "rp-2", reportName: "Critical Cases Report", subject: "Neurology", createdBy: "Dr. Sarah Chen", createdAtText: "Yesterday", status: "Ready" },
   ],
   users: [
-    { id: "admin-demo", displayName: "Alex Drummond", email: "admin@caretrack.test", role: "administrator", staffType: "admin", department: "Administration", active: true, lastLoginAtText: "Today" },
-    { id: "doctor-demo", displayName: "Dr. Sarah Chen", email: "s.chen@caretrack.test", role: "clinician", staffType: "doctor", department: "Neurology", active: true, lastLoginAtText: "Today" },
-    { id: "reception-demo", displayName: "Mina Patel", email: "m.patel@caretrack.test", role: "receptionist", staffType: "reception", department: "Front Desk", active: true, lastLoginAtText: "Yesterday" },
+    { id: "admin-demo", displayName: "Alex Drummond", email: "admin@caretrack.test", role: "admin", staffType: "admin", department: "Administration", active: true, lastLoginAtText: "Today" },
+    { id: "doctor-demo", displayName: "Dr. Sarah Chen", email: "s.chen@caretrack.test", role: "doctor", staffType: "doctor", department: "Neurology", active: true, lastLoginAtText: "Today" },
+    { id: "reception-demo", displayName: "Mina Patel", email: "m.patel@caretrack.test", role: "receptionist", staffType: "receptionist", department: "Front Desk", active: true, lastLoginAtText: "Yesterday" },
   ],
   auditLogs: [
-    { id: "audit-1", timestampText: "Today 09:42", userName: "Alex Drummond", role: "Administrator", action: "Created", entity: "Doctor", details: "Added Dr. Maya Parker", device: "Web app" },
+    { id: "audit-1", timestampText: "Today 09:42", userName: "Alex Drummond", role: "Admin", action: "Created", entity: "Doctor", details: "Added Dr. Maya Parker", device: "Web app" },
     { id: "audit-2", timestampText: "Today 09:10", userName: "Mina Patel", role: "Receptionist", action: "Updated", entity: "Patient", details: "Updated emergency contact", device: "Web app" },
   ],
 };
@@ -152,23 +145,27 @@ function initials(name = "") {
 
 function normalizeRole(value) {
   const role = String(value || "").toLowerCase().trim();
-  if (["administrator", "admin"].includes(role)) return "administrator";
-  if (["clinician", "doctor", "nurse", "clinical"].includes(role)) return "clinician";
+  if (["admin", "administrator"].includes(role)) return "admin";
+  if (["doctor", "clinician", "clinical"].includes(role)) return "doctor";
   if (["receptionist", "reception", "frontdesk", "front_desk"].includes(role)) return "receptionist";
   return "";
 }
 
 function staffTypeForRole(role, preferred = "") {
   const clean = String(preferred || "").toLowerCase().trim();
-  if (["admin", "doctor", "nurse", "reception"].includes(clean)) return clean;
-  if (role === "administrator") return "admin";
-  if (role === "receptionist") return "reception";
+  if (["admin", "doctor", "receptionist"].includes(clean)) return clean;
+  if (clean === "reception") return "receptionist";
+  if (clean === "administrator") return "admin";
+  if (["clinician", "clinical"].includes(clean)) return "doctor";
+  if (role === "admin") return "admin";
+  if (role === "receptionist") return "receptionist";
   return "doctor";
 }
 
 function roleBadge(role) {
-  const color = role === "administrator" ? "cyan" : role === "clinician" ? "teal" : "purple";
-  return `<span class="badge ${color}">${roleLabels[role] || "Staff"}</span>`;
+  const normalized = normalizeRole(role);
+  const color = normalized === "admin" ? "cyan" : normalized === "doctor" ? "teal" : "purple";
+  return `<span class="badge ${color}">${roleLabels[normalized] || "Staff"}</span>`;
 }
 
 function statusBadge(status) {
@@ -197,7 +194,7 @@ function pageUrl(page, params = {}) {
     reports: "reports.html",
     "patient-report": "patient-report.html",
     schedules: "schedules.html",
-    users: "users.html",
+    users: "doctors.html",
     settings: "settings.html",
     audit: "audit-logs.html",
     "access-denied": "access-denied.html",
@@ -261,18 +258,19 @@ function authReady() {
 }
 
 function inferRegistration(path = "") {
-  if (path.includes("/admin/")) return { role: "administrator", staffType: "admin" };
-  if (path.includes("/doctor/")) return { role: "clinician", staffType: "doctor" };
-  if (path.includes("/nurse/")) return { role: "clinician", staffType: "nurse" };
-  if (path.includes("/reception/")) return { role: "receptionist", staffType: "reception" };
+  if (path.includes("/admin/")) return { role: "admin", staffType: "admin" };
+  if (path.includes("/doctor/")) return { role: "doctor", staffType: "doctor" };
+  if (path.includes("/doctors/")) return { role: "doctor", staffType: "doctor" };
+  if (path.includes("/reception/") || path.includes("/receptionist/")) return { role: "receptionist", staffType: "receptionist" };
   return { role: "", staffType: "" };
 }
 
 async function loadRegistration(user) {
   const paths = [
     `registration/admin/${user.uid}`,
+    `registration/doctors/${user.uid}`,
+    `registration/receptionist/${user.uid}`,
     `registration/clinicks/doctor/${user.uid}`,
-    `registration/clinicks/nurse/${user.uid}`,
     `registration/clinicks/reception/${user.uid}`,
     `access/users/${user.uid}`,
   ];
@@ -298,9 +296,32 @@ async function loadRegistration(user) {
 }
 
 async function buildProfile(user) {
-  const token = await user.getIdTokenResult();
+  let token = await user.getIdTokenResult();
   const registration = await loadRegistration(user);
-  const claims = token.claims || {};
+  let claims = token.claims || {};
+  const registrationActive = registration?.active === true || registration?.status === "active";
+  const registrationRole = normalizeRole(registration?.role || registration?.staffType);
+
+  if (
+    registrationActive
+    && registrationRole
+    && (
+      normalizeRole(claims.role) !== registrationRole
+      || String(claims.role || "").toLowerCase().trim() !== registrationRole
+      || claims.status !== "active"
+      || claims.active !== true
+      || !claims.clinicId
+    )
+  ) {
+    try {
+      await httpsCallable(functions, "syncOwnAccessClaims")();
+      token = await user.getIdTokenResult(true);
+      claims = token.claims || {};
+    } catch (error) {
+      console.warn("CareTrack claim refresh skipped", error);
+    }
+  }
+
   const role = normalizeRole(claims.role || registration?.role || registration?.staffType);
   const staffType = staffTypeForRole(role, claims.staffType || registration?.staffType);
   const active = claims.status === "active" || claims.active === true || registration?.active === true || registration?.status === "active";
@@ -519,12 +540,19 @@ async function writeAudit(action, entity, entityId, details = {}) {
 }
 
 function wireTableTools() {
-  document.querySelectorAll("[data-filter-table]").forEach((input) => {
+  document.querySelectorAll("[data-filter-table], [data-filter-tables]").forEach((input) => {
     input.addEventListener("input", () => {
-      const table = document.getElementById(input.dataset.filterTable);
       const needle = input.value.toLowerCase();
-      table?.querySelectorAll("tbody tr").forEach((row) => {
-        row.hidden = !row.textContent.toLowerCase().includes(needle);
+      const tableIds = (input.dataset.filterTables || input.dataset.filterTable || "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+      tableIds.forEach((tableId) => {
+        const table = document.getElementById(tableId);
+        table?.querySelectorAll("tbody tr").forEach((row) => {
+          const haystack = `${row.textContent} ${row.dataset.searchText || ""}`.toLowerCase();
+          row.hidden = !haystack.includes(needle);
+        });
       });
     });
   });
@@ -590,25 +618,29 @@ function bindRecordForm(selector, collectionName, transform, successUrl) {
 }
 
 async function renderDashboard(config) {
-  const [doctors, patients, diagnoses, auditLogs] = await Promise.all([
+  const canViewDiagnoses = can(["admin", "doctor"]);
+  const canViewAudit = can(["admin"]);
+  const [doctors, patients, diagnoses, auditLogs, users] = await Promise.all([
     readDocs("doctors", samples.doctors),
     readDocs("patients", samples.patients),
-    readDocs("diagnoses", samples.diagnoses),
-    readDocs("auditLogs", samples.auditLogs, { orderBy: ["timestamp", "desc"], limit: 5 }),
+    canViewDiagnoses ? readDocs("diagnoses", samples.diagnoses) : Promise.resolve([]),
+    canViewAudit ? readDocs("auditLogs", samples.auditLogs, { orderBy: ["timestamp", "desc"], limit: 5 }) : Promise.resolve([]),
+    readRtdUsers(),
   ]);
   const critical = patients.filter((patient) => String(patient.status || "").toLowerCase().includes("critical")).length;
+  const receptionistCount = users.filter((user) => normalizeRole(user.role || user.staffType) === "receptionist").length;
   const actions = html`
-    ${can(["administrator"]) ? `<a class="btn primary" href="${pageUrl("doctor-form")}">${icons.plus} Add Doctor</a>` : ""}
-    ${can(["administrator", "clinician", "receptionist"]) ? `<a class="btn primary" href="${pageUrl("patient-form")}">${icons.plus} Register Patient</a>` : ""}
-    ${can(["administrator", "clinician"]) ? `<a class="btn" href="${pageUrl("diagnosis-form")}">${icons.activity} Add Diagnosis</a>` : ""}`;
+    ${can(["admin"]) ? `<a class="btn primary" href="${pageUrl("doctor-form")}">${icons.plus} Add Doctor</a>` : ""}
+    ${can(["admin", "doctor", "receptionist"]) ? `<a class="btn primary" href="${pageUrl("patient-form")}">${icons.plus} Register Patient</a>` : ""}
+    ${can(["admin", "doctor"]) ? `<a class="btn" href="${pageUrl("diagnosis-form")}">${icons.activity} Add Diagnosis</a>` : ""}`;
 
   return html`
     ${pageHeader(config, actions)}
     ${state.demoMode ? `<div class="notice">Firestore data is unavailable for this session, so CareTrack is showing sample rows while keeping the UI functional.</div><br>` : ""}
     <div class="grid stats">
-      ${statCard("Total Doctors", doctors.length, "Active clinical profiles", "cyan", "user")}
+      ${statCard("Total Staff", doctors.length + receptionistCount, "Doctors and receptionists", "cyan", "users")}
       ${statCard("Total Patients", patients.length, "Registered patient records", "teal", "users")}
-      ${statCard("Active Diagnoses", diagnoses.length, "Linked medical records", "blue", "activity")}
+      ${canViewDiagnoses ? statCard("Active Diagnoses", diagnoses.length, "Linked medical records", "blue", "activity") : ""}
       ${statCard("Critical Cases", critical, "Needs close monitoring", "rose", "shield")}
     </div>
     <br>
@@ -618,17 +650,17 @@ async function renderDashboard(config) {
         ${patientsTable(patients.slice(0, 5), false)}
       </div>
       <div class="panel">
-        <div class="panel-header"><div><h2 class="panel-title">Recent Activity</h2><p class="panel-subtitle">Important system events.</p></div><a class="btn small" href="${pageUrl("audit")}">Audit</a></div>
+        <div class="panel-header"><div><h2 class="panel-title">Recent Activity</h2><p class="panel-subtitle">Important system events.</p></div>${canViewAudit ? `<a class="btn small" href="${pageUrl("audit")}">Audit</a>` : ""}</div>
         <div class="timeline">
-          ${auditLogs.slice(0, 5).map((item) => timelineItem(item.action || "Updated", item.details || item.entity || "CareTrack activity", item.timestampText || item.createdAtText || "Recently")).join("")}
+          ${auditLogs.slice(0, 5).map((item) => timelineItem(item.action || "Updated", item.details || item.entity || "CareTrack activity", item.timestampText || item.createdAtText || "Recently")).join("") || `<div class="empty-state">No recent activity.</div>`}
         </div>
       </div>
     </div>
     <br>
     <div class="grid three">
-      <a class="panel pad" href="${pageUrl("doctors")}" style="text-decoration:none"><h2 class="panel-title">Doctor Management</h2><p class="page-subtitle">Profiles, departments, specialties, and schedules.</p></a>
-      <a class="panel pad" href="${pageUrl("diagnoses")}" style="text-decoration:none"><h2 class="panel-title">Diagnosis Tracking</h2><p class="page-subtitle">ICD codes, severity, follow-ups, and clinician notes.</p></a>
-      <a class="panel pad" href="${pageUrl("reports")}" style="text-decoration:none"><h2 class="panel-title">Reports</h2><p class="page-subtitle">Printable patient diagnosis summaries and clinic reports.</p></a>
+      <a class="panel pad" href="${pageUrl("doctors")}" style="text-decoration:none"><h2 class="panel-title">Staff Directory</h2><p class="page-subtitle">Doctors, receptionists, departments, contact details, and room assignments.</p></a>
+      ${canViewDiagnoses ? `<a class="panel pad" href="${pageUrl("diagnoses")}" style="text-decoration:none"><h2 class="panel-title">Diagnosis Tracking</h2><p class="page-subtitle">ICD codes, severity, follow-ups, and doctor notes.</p></a>` : ""}
+      ${canViewDiagnoses ? `<a class="panel pad" href="${pageUrl("reports")}" style="text-decoration:none"><h2 class="panel-title">Reports</h2><p class="page-subtitle">Printable patient diagnosis summaries and clinic reports.</p></a>` : ""}
     </div>`;
 }
 
@@ -650,17 +682,77 @@ function timelineItem(title, body, time) {
     </div>`;
 }
 
+function staffDisplayName(staff = {}) {
+  return staff.displayName || staff.fullName || staff.name || staff.email || staff.uid || staff.id || "Staff member";
+}
+
+function staffRecordKey(staff = {}) {
+  return String(staff.uid || staff.id || staff.email || staffDisplayName(staff)).toLowerCase();
+}
+
+function userToDoctorProfile(user = {}) {
+  const uid = user.uid || user.id || user.email || "";
+  return {
+    ...user,
+    id: uid,
+    uid,
+    fullName: staffDisplayName(user),
+    specialty: user.specialty || user.department || user.departmentId || "General Medicine",
+    department: user.department || user.departmentId || "-",
+    room: user.room || user.officeRoom || "Room pending",
+    status: user.active === false || user.status === "disabled" ? "Disabled" : (user.status || "Available"),
+    assignedPatients: user.assignedPatients ?? 0,
+  };
+}
+
+function mergeDoctorSources(doctors = [], staffUsers = []) {
+  const merged = new Map();
+  const emailIndex = new Map();
+
+  doctors.forEach((doctor) => {
+    const key = staffRecordKey(doctor);
+    merged.set(key, doctor);
+    if (doctor.email) emailIndex.set(String(doctor.email).toLowerCase(), key);
+  });
+
+  staffUsers
+    .filter((user) => normalizeRole(user.role || user.staffType) === "doctor")
+    .forEach((user) => {
+      const byEmail = user.email ? emailIndex.get(String(user.email).toLowerCase()) : "";
+      const key = byEmail || staffRecordKey(user);
+      const existing = merged.get(key) || {};
+      merged.set(key, { ...userToDoctorProfile(user), ...existing });
+    });
+
+  return [...merged.values()];
+}
+
 async function renderDoctors(config) {
-  const doctors = await readDocs("doctors", samples.doctors);
-  const actions = can(["administrator"]) ? `<a class="btn primary" href="${pageUrl("doctor-form")}">${icons.plus} Add Doctor</a>` : "";
+  const [storedDoctors, rtdUsers] = await Promise.all([
+    readDocs("doctors", samples.doctors),
+    readRtdUsers(),
+  ]);
+  const staffUsers = rtdUsers.length ? rtdUsers : (state.demoMode ? samples.users : []);
+  const doctors = mergeDoctorSources(storedDoctors, rtdUsers);
+  const receptionists = staffUsers.filter((user) => normalizeRole(user.role || user.staffType) === "receptionist");
+  const actions = can(["admin"]) ? `<a class="btn primary" href="${pageUrl("doctor-form")}">${icons.plus} Add Doctor</a>` : "";
   return html`
     ${pageHeader(config, actions)}
     <div class="toolbar">
-      <div class="search-field"><input data-filter-table="doctorsTable" placeholder="Search doctors by name, specialty, or department"></div>
-      <div class="field"><select><option>All Departments</option><option>Cardiology</option><option>Neurology</option><option>Pediatrics</option></select></div>
-      <div class="field"><select><option>All Specialties</option><option>Cardiology</option><option>Neurology</option><option>General Medicine</option></select></div>
+      <div class="search-field"><input data-filter-tables="doctorsTable,receptionistsTable" placeholder="Search staff by name, role, department, email, or contact"></div>
     </div>
-    <div class="panel">${doctorsTable(doctors)}</div>`;
+    <div class="panel">
+      <div class="panel-header"><h2 class="panel-title">Doctors</h2></div>
+      ${doctorsTable(doctors)}
+    </div>
+    <br>
+    <div class="grid two">
+      <div class="panel">
+        <div class="panel-header"><h2 class="panel-title">Receptionists</h2></div>
+        ${receptionistsTable(receptionists)}
+      </div>
+      ${can(["admin"]) ? receptionistForm() : ""}
+    </div>`;
 }
 
 function doctorsTable(doctors) {
@@ -670,7 +762,7 @@ function doctorsTable(doctors) {
         <thead><tr><th>Doctor Name</th><th>Specialty</th><th>Department</th><th>Contact</th><th>Assigned Patients</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>
           ${doctors.map((doctor) => html`
-            <tr>
+            <tr data-search-text="${escapeText(`doctor ${doctorName(doctor)} ${doctor.specialty || ""} ${doctor.department || ""} ${doctor.email || ""} ${doctor.phone || ""}`)}">
               <td><div class="entity"><span class="avatar">${initials(doctorName(doctor))}</span><div><strong>${escapeText(doctorName(doctor))}</strong><span>${escapeText(doctor.room || doctor.officeRoom || "Room pending")}</span></div></div></td>
               <td>${escapeText(doctor.specialty || "-")}</td>
               <td>${escapeText(doctor.department || "-")}</td>
@@ -679,11 +771,52 @@ function doctorsTable(doctors) {
               <td>${statusBadge(doctor.status || "Available")}</td>
               <td><div class="row-actions">
                 <a class="btn small" href="${pageUrl("doctor-detail", { id: doctor.id })}">View</a>
-                ${can(["administrator"]) ? `<a class="btn small" href="${pageUrl("doctor-form", { id: doctor.id })}">Edit</a><button class="btn small danger" data-delete-record="doctors:${escapeText(doctor.id)}">Delete</button>` : ""}
+                ${can(["admin"]) ? `<a class="btn small" href="${pageUrl("doctor-form", { id: doctor.id })}">Edit</a><button class="btn small danger" data-delete-record="doctors:${escapeText(doctor.id)}">Delete</button>` : ""}
               </div></td>
             </tr>`).join("")}
         </tbody>
       </table>
+    </div>`;
+}
+
+function receptionistsTable(receptionists) {
+  return html`
+    <div class="table-wrap">
+      <table id="receptionistsTable">
+        <thead><tr><th>Name</th><th>Email</th><th>Department</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
+          ${receptionists.map((user) => {
+            const uid = user.uid || user.id || "";
+            return html`
+              <tr data-search-text="${escapeText(`receptionist ${staffDisplayName(user)} ${user.email || ""} ${user.department || user.departmentId || ""} ${user.phone || ""}`)}">
+                <td><div class="entity"><span class="avatar">${initials(staffDisplayName(user))}</span><div><strong>${escapeText(staffDisplayName(user))}</strong><span>${escapeText(uid)}</span></div></div></td>
+                <td>${escapeText(user.email || "-")}</td>
+                <td>${escapeText(user.department || user.departmentId || "-")}</td>
+                <td>${statusBadge(user.active === false || user.status === "disabled" ? "Disabled" : "Active")}</td>
+                <td><div class="row-actions">${can(["admin"]) ? `<button class="btn small danger" data-disable-user="${escapeText(uid)}" ${uid === state.profile?.uid ? "disabled" : ""}>Disable</button>` : "-"}</div></td>
+              </tr>`;
+          }).join("") || `<tr><td colspan="5"><div class="empty-state">No receptionists found.</div></td></tr>`}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function receptionistForm() {
+  return html`
+    <div class="panel pad" id="staffFormPanel">
+      <h2 class="panel-title">Add Receptionist</h2>
+      <br>
+      <form id="staffUserForm">
+        <input type="hidden" name="staffType" value="receptionist">
+        <div class="form-grid">
+          ${field("Full Name", "displayName")}
+          ${field("Email", "email", "", "email")}
+          ${field("Temporary Password", "temporaryPassword", "", "password")}
+          ${field("Department", "department", "Front Desk")}
+          ${selectField("Status", "active", ["true", "false"], "true")}
+        </div>
+        <div class="form-actions"><button class="btn primary" type="submit">Create Receptionist</button></div>
+      </form>
     </div>`;
 }
 
@@ -728,7 +861,7 @@ async function renderDoctorDetail(config) {
   const patients = (await readDocs("patients", samples.patients)).filter((patient) => !doctor?.id || patient.assignedDoctorId === doctor.id || patient.assignedDoctorName === doctorName(doctor)).slice(0, 5);
   const schedules = (await readDocs("schedules", samples.schedules)).filter((item) => item.doctorId === doctor?.id || item.doctorName === doctorName(doctor));
   return html`
-    ${pageHeader(config, `<a class="btn" href="${pageUrl("schedules", { doctor: doctor?.id || "" })}">View Schedule</a>${can(["administrator"]) ? `<a class="btn primary" href="${pageUrl("doctor-form", { id: doctor?.id || "" })}">Edit Doctor</a>` : ""}`)}
+    ${pageHeader(config, `<a class="btn" href="${pageUrl("schedules", { doctor: doctor?.id || "" })}">View Schedule</a>${can(["admin"]) ? `<a class="btn primary" href="${pageUrl("doctor-form", { id: doctor?.id || "" })}">Edit Doctor</a>` : ""}`)}
     <div class="panel">
       <div class="profile-header">
         <div class="profile-main">
@@ -754,7 +887,7 @@ async function renderDoctorDetail(config) {
 
 async function renderPatients(config) {
   const patients = await readDocs("patients", samples.patients);
-  const actions = can(["administrator", "clinician", "receptionist"]) ? `<a class="btn primary" href="${pageUrl("patient-form")}">${icons.plus} Register Patient</a>` : "";
+  const actions = can(["admin", "doctor", "receptionist"]) ? `<a class="btn primary" href="${pageUrl("patient-form")}">${icons.plus} Register Patient</a>` : "";
   return html`
     ${pageHeader(config, actions)}
     <div class="toolbar">
@@ -782,7 +915,7 @@ function patientsTable(patients, includeActions = true) {
               <td>${escapeText(patient.lastDiagnosis || "-")}</td>
               <td>${escapeText(patient.lastUpdated || patient.lastUpdatedText || "Recently")}</td>
               <td>${statusBadge(patient.status || "Stable")}</td>
-              ${includeActions ? `<td><div class="row-actions"><a class="btn small" href="${pageUrl("patient-profile", { id: patient.id })}">View</a>${can(["administrator", "clinician", "receptionist"]) ? `<a class="btn small" href="${pageUrl("patient-form", { id: patient.id })}">Edit</a>` : ""}${can(["administrator"]) ? `<button class="btn small danger" data-delete-record="patients:${escapeText(patient.id)}">Delete</button>` : ""}</div></td>` : ""}
+              ${includeActions ? `<td><div class="row-actions"><a class="btn small" href="${pageUrl("patient-profile", { id: patient.id })}">View</a>${can(["admin", "doctor", "receptionist"]) ? `<a class="btn small" href="${pageUrl("patient-form", { id: patient.id })}">Edit</a>` : ""}${can(["admin"]) ? `<button class="btn small danger" data-delete-record="patients:${escapeText(patient.id)}">Delete</button>` : ""}</div></td>` : ""}
             </tr>`).join("")}
         </tbody>
       </table>
@@ -836,17 +969,18 @@ async function renderPatientForm(config) {
 }
 
 async function renderPatientProfile(config) {
+  const canViewDiagnoses = can(["admin", "doctor"]);
   const patients = await readDocs("patients", samples.patients);
   const id = getParam("id") || patients[0]?.id;
   const patient = await readDoc("patients", id, patients.find((item) => item.id === id) || patients[0]);
   const [doctors, diagnoses] = await Promise.all([
     readDocs("doctors", samples.doctors),
-    readDocs("diagnoses", samples.diagnoses),
+    canViewDiagnoses ? readDocs("diagnoses", samples.diagnoses) : Promise.resolve([]),
   ]);
   const doctor = doctors.find((item) => item.id === patient?.assignedDoctorId || doctorName(item) === patient?.assignedDoctorName) || doctors[0];
   const patientDiagnoses = diagnoses.filter((item) => item.patientId === patient?.id || item.patientId === patient?.patientId || item.patientName === patientName(patient));
   return html`
-    ${pageHeader(config, `${can(["administrator", "clinician"]) ? `<a class="btn primary" href="${pageUrl("diagnosis-form", { patientId: patient?.id || "" })}">${icons.plus} Add Diagnosis</a>` : ""}<a class="btn" href="${pageUrl("patient-report", { id: patient?.id || "" })}">Generate Report</a>`)}
+    ${pageHeader(config, `${can(["admin", "doctor"]) ? `<a class="btn primary" href="${pageUrl("diagnosis-form", { patientId: patient?.id || "" })}">${icons.plus} Add Diagnosis</a><a class="btn" href="${pageUrl("patient-report", { id: patient?.id || "" })}">Generate Report</a>` : ""}`)}
     <div class="panel">
       <div class="profile-header">
         <div class="profile-main"><span class="avatar large">${initials(patientName(patient))}</span><div><h2>${escapeText(patientName(patient))}</h2><p>${escapeText(patient?.patientId || patient?.id)} | ${escapeText(patient?.age || ageFromDob(patient?.dateOfBirth) || "-")} years | ${escapeText(patient?.gender || "-")}</p></div></div>
@@ -861,14 +995,14 @@ async function renderPatientProfile(config) {
       </div>
       <div class="grid">
         <div class="panel pad"><h2 class="panel-title">Assigned Doctor</h2><br><div class="entity"><span class="avatar">${initials(doctorName(doctor))}</span><div><strong>${escapeText(doctorName(doctor))}</strong><span>${escapeText(doctor?.specialty || "")} | ${escapeText(doctor?.department || "")}</span></div></div><br><div class="info-list">${infoRow("Contact", doctor?.phone)}${infoRow("Email", doctor?.email)}</div></div>
-        <div class="panel"><div class="panel-header"><h2 class="panel-title">Diagnosis History</h2></div><div class="timeline">${patientDiagnoses.map((item) => timelineItem(item.description || item.icdCode, `${item.severity || "Medium"} severity by ${item.assignedDoctorName || "Clinician"}`, item.diagnosisDate || "Recent")).join("") || `<div class="empty-state">No diagnosis records yet.</div>`}</div></div>
+        <div class="panel"><div class="panel-header"><h2 class="panel-title">Diagnosis History</h2></div><div class="timeline">${patientDiagnoses.map((item) => timelineItem(item.description || item.icdCode, `${item.severity || "Medium"} severity by ${item.assignedDoctorName || "Doctor"}`, item.diagnosisDate || "Recent")).join("") || `<div class="empty-state">No diagnosis records yet.</div>`}</div></div>
       </div>
     </div>`;
 }
 
 async function renderDiagnoses(config) {
   const diagnoses = await readDocs("diagnoses", samples.diagnoses);
-  const actions = can(["administrator", "clinician"]) ? `<a class="btn primary" href="${pageUrl("diagnosis-form")}">${icons.plus} Add Diagnosis</a>` : "";
+  const actions = can(["admin", "doctor"]) ? `<a class="btn primary" href="${pageUrl("diagnosis-form")}">${icons.plus} Add Diagnosis</a>` : "";
   return html`
     ${pageHeader(config, actions)}
     <div class="toolbar">
@@ -895,7 +1029,7 @@ function diagnosesTable(diagnoses, includeActions = true) {
               <td>${statusBadge(item.severity || "Medium")}</td>
               <td>${escapeText(item.diagnosisDate || "-")}</td>
               <td>${escapeText(item.lastUpdated || "Recently")}</td>
-              ${includeActions ? `<td><div class="row-actions"><a class="btn small" href="${pageUrl("patient-profile", { id: item.patientId || "" })}">View</a>${can(["administrator", "clinician"]) ? `<a class="btn small" href="${pageUrl("diagnosis-form", { id: item.id })}">Edit</a>` : ""}${can(["administrator"]) ? `<button class="btn small danger" data-delete-record="diagnoses:${escapeText(item.id)}">Delete</button>` : ""}</div></td>` : ""}
+              ${includeActions ? `<td><div class="row-actions"><a class="btn small" href="${pageUrl("patient-profile", { id: item.patientId || "" })}">View</a>${can(["admin", "doctor"]) ? `<a class="btn small" href="${pageUrl("diagnosis-form", { id: item.id })}">Edit</a>` : ""}${can(["admin"]) ? `<button class="btn small danger" data-delete-record="diagnoses:${escapeText(item.id)}">Delete</button>` : ""}</div></td>` : ""}
             </tr>`).join("")}
         </tbody>
       </table>
@@ -988,7 +1122,7 @@ async function renderPatientReport(config) {
       <h2>Assigned Doctor</h2>
       <p><strong>${escapeText(doctorName(doctor))}</strong> | ${escapeText(doctor?.specialty || "-")} | ${escapeText(doctor?.department || "-")} | ${escapeText(doctor?.phone || "-")}</p>
       <h2>Diagnosis History</h2>
-      <table><thead><tr><th>ICD Code</th><th>Description</th><th>Severity</th><th>Date</th><th>Clinician Notes</th></tr></thead><tbody>${rows.map((item) => `<tr><td>${escapeText(item.icdCode)}</td><td>${escapeText(item.description)}</td><td>${escapeText(item.severity)}</td><td>${escapeText(item.diagnosisDate)}</td><td>${escapeText(item.clinicalNotes || "-")}</td></tr>`).join("") || `<tr><td colspan="5">No diagnosis records available.</td></tr>`}</tbody></table>
+      <table><thead><tr><th>ICD Code</th><th>Description</th><th>Severity</th><th>Date</th><th>Doctor Notes</th></tr></thead><tbody>${rows.map((item) => `<tr><td>${escapeText(item.icdCode)}</td><td>${escapeText(item.description)}</td><td>${escapeText(item.severity)}</td><td>${escapeText(item.diagnosisDate)}</td><td>${escapeText(item.clinicalNotes || "-")}</td></tr>`).join("") || `<tr><td colspan="5">No diagnosis records available.</td></tr>`}</tbody></table>
       <h2>Summary</h2>
       <p>This report contains patient diagnosis records available to authorized CareTrack clinic staff at generation time.</p>
       <p><strong>Generated by:</strong> ${escapeText(state.profile?.displayName || "CareTrack Staff")}</p>
@@ -997,7 +1131,7 @@ async function renderPatientReport(config) {
 
 async function renderSchedules(config) {
   const schedules = await readDocs("schedules", samples.schedules);
-  const actions = can(["administrator"]) ? `<button class="btn primary" id="addScheduleButton">${icons.plus} Add Schedule</button>` : `<span class="badge cyan">View-only mode</span>`;
+  const actions = can(["admin"]) ? `<button class="btn primary" id="addScheduleButton">${icons.plus} Add Schedule</button>` : `<span class="badge cyan">View-only mode</span>`;
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
   return html`
     ${pageHeader(config, actions)}
@@ -1012,35 +1146,6 @@ function schedulesTable(schedules) {
     <div class="table-wrap"><table id="schedulesTable"><thead><tr><th>Doctor Name</th><th>Department</th><th>Day</th><th>Start Time</th><th>End Time</th><th>Room</th><th>Status</th></tr></thead><tbody>${schedules.map((item) => `<tr><td>${escapeText(item.doctorName)}</td><td>${escapeText(item.department)}</td><td>${escapeText(item.day)}</td><td>${escapeText(item.startTime)}</td><td>${escapeText(item.endTime)}</td><td>${escapeText(item.room)}</td><td>${statusBadge(item.status)}</td></tr>`).join("")}</tbody></table></div>`;
 }
 
-async function renderUsers(config) {
-  const [firestoreUsers, rtdUsers] = await Promise.all([readDocs("staffProfiles", samples.users), readRtdUsers()]);
-  const users = rtdUsers.length ? rtdUsers : firestoreUsers;
-  return html`
-    ${pageHeader(config, `<button class="btn primary" id="toggleStaffForm">${icons.plus} Add Staff User</button>`)}
-    <div class="grid two">
-      <div>
-        <div class="toolbar"><div class="search-field"><input data-filter-table="usersTable" placeholder="Search staff by name, email, role, or department"></div><div class="field"><select><option>All Roles</option><option>Administrator</option><option>Clinician</option><option>Receptionist</option></select></div><div class="field"><select><option>All Statuses</option><option>Active</option><option>Disabled</option></select></div></div>
-        <div class="panel">${usersTable(users)}</div>
-      </div>
-      <div class="panel pad" id="staffFormPanel">
-        <h2 class="panel-title">Add Staff User</h2>
-        <p class="panel-subtitle">Creates Firebase Auth user, writes RTD registration, mirrors custom claims, and adds Firestore staff profile.</p>
-        <br>
-        <form id="staffUserForm">
-          <div class="form-grid">
-            ${field("Full Name", "displayName")}
-            ${field("Email", "email", "", "email")}
-            ${field("Temporary Password", "temporaryPassword", "", "password")}
-            ${selectField("Staff Type", "staffType", ["admin", "doctor", "nurse", "reception"], "doctor")}
-            ${field("Department", "department", "General")}
-            ${selectField("Status", "active", ["true", "false"], "true")}
-          </div>
-          <div class="form-actions"><button class="btn primary" type="submit">Create Staff User</button></div>
-        </form>
-      </div>
-    </div>`;
-}
-
 async function readRtdUsers() {
   try {
     const listStaffUsers = httpsCallable(functions, "listStaffUsers");
@@ -1052,9 +1157,10 @@ async function readRtdUsers() {
 
   const paths = [
     ["admin", "registration/admin"],
+    ["doctor", "registration/doctors"],
+    ["receptionist", "registration/receptionist"],
     ["doctor", "registration/clinicks/doctor"],
-    ["nurse", "registration/clinicks/nurse"],
-    ["reception", "registration/clinicks/reception"],
+    ["receptionist", "registration/clinicks/reception"],
   ];
   const users = [];
   for (const [staffType, path] of paths) {
@@ -1063,7 +1169,7 @@ async function readRtdUsers() {
       if (snapshot.exists()) {
         Object.entries(snapshot.val()).forEach(([uid, value]) => {
           const role = normalizeRole(value.role || staffType);
-          users.push({ id: uid, uid, staffType, role, ...value });
+          users.push({ id: uid, uid, ...value, staffType: staffTypeForRole(role, value.staffType), role });
         });
       }
     } catch (error) {
@@ -1071,27 +1177,6 @@ async function readRtdUsers() {
     }
   }
   return users;
-}
-
-function staffTypeDropdown(user) {
-  const uid = String(user.uid || user.id || "");
-  const current = staffTypeForRole(normalizeRole(user.role || user.staffType), user.staffType);
-  const disabled = uid && uid === state.profile?.uid ? "disabled" : "";
-  const options = ["admin", "doctor", "nurse", "reception"];
-  return html`
-    <select class="table-select" data-staff-type-select="${escapeText(uid)}" data-current-staff-type="${escapeText(current)}" ${disabled}>
-      ${options.map((item) => `<option value="${escapeText(item)}" ${item === current ? "selected" : ""}>${escapeText(staffTypeLabels[item] || item)}</option>`).join("")}
-    </select>`;
-}
-
-function usersTable(users) {
-  return html`
-    <div class="table-wrap">
-      <table id="usersTable">
-        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Staff Type</th><th>Department</th><th>Status</th><th>Last Login</th><th>Actions</th></tr></thead>
-        <tbody>${users.map((user) => html`<tr><td><div class="entity"><span class="avatar">${initials(user.displayName || user.email)}</span><div><strong>${escapeText(user.displayName || user.email)}</strong><span>${escapeText(user.uid || user.id)}</span></div></div></td><td>${escapeText(user.email || "-")}</td><td>${roleBadge(normalizeRole(user.role || user.staffType))}</td><td>${staffTypeDropdown(user)}</td><td>${escapeText(user.department || user.departmentId || "-")}</td><td>${statusBadge(user.active === false ? "Disabled" : "Active")}</td><td>${escapeText(user.lastLoginAtText || "Not recorded")}</td><td><div class="row-actions"><button class="btn small danger" data-disable-user="${escapeText(user.uid || user.id)}" ${(user.uid || user.id) === state.profile?.uid ? "disabled" : ""}>Disable</button></div></td></tr>`).join("")}</tbody>
-      </table>
-    </div>`;
 }
 
 async function renderSettings(config) {
@@ -1134,7 +1219,7 @@ function renderAccessDenied(config) {
         <span class="ct-logo-mark" style="margin:auto">${icons.lock}</span>
         <h1 class="page-title">Access Denied</h1>
         <p class="page-subtitle">You do not have permission to view this page.</p>
-        <p class="security-note">Please contact your system administrator if you believe this is a mistake.</p>
+        <p class="security-note">Please contact your system admin if you believe this is a mistake.</p>
         <br>
         <a class="btn primary" href="admin.html">Back to Dashboard</a>
       </div>
@@ -1195,7 +1280,7 @@ function bindPageBehavior() {
         __id: uid,
         uid,
         displayName: data.fullName || data.email,
-        role: "clinician",
+        role: "doctor",
         staffType: "doctor",
         active: true,
         assignedPatients: Number(data.assignedPatients || 0),
@@ -1290,33 +1375,6 @@ function bindPageBehavior() {
     });
   });
 
-  document.querySelectorAll("[data-staff-type-select]").forEach((select) => {
-    select.addEventListener("change", async () => {
-      const previous = select.dataset.currentStaffType;
-      const staffType = select.value;
-      const uid = select.dataset.staffTypeSelect;
-      if (!uid) return;
-
-      if (!confirm(`Change this staff member to ${staffTypeLabels[staffType] || staffType}?`)) {
-        select.value = previous;
-        return;
-      }
-
-      select.disabled = true;
-      try {
-        const setStaffRole = httpsCallable(functions, "setStaffRole");
-        const response = await setStaffRole({ uid, staffType, clinicId: state.clinicId });
-        select.dataset.currentStaffType = response.data?.staffType || staffType;
-        toast("Staff role updated in Auth claims, RTD registration, and Firestore profile.");
-        setTimeout(() => window.location.reload(), 900);
-      } catch (error) {
-        select.value = previous;
-        toast(error.message || "Could not update staff role.");
-      } finally {
-        select.disabled = false;
-      }
-    });
-  });
 }
 
 async function init() {
