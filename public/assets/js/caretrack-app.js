@@ -735,7 +735,7 @@ async function renderDoctors(config) {
   const staffUsers = rtdUsers.length ? rtdUsers : (state.demoMode ? samples.users : []);
   const doctors = mergeDoctorSources(storedDoctors, rtdUsers);
   const receptionists = staffUsers.filter((user) => normalizeRole(user.role || user.staffType) === "receptionist");
-  const actions = can(["admin"]) ? `<a class="btn primary" href="${pageUrl("doctor-form")}">${icons.plus} Add Doctor</a>` : "";
+  const actions = can(["admin"]) ? `<button class="btn primary" type="button" id="openStaffModal">${icons.plus} Add Staff</button>` : "";
   return html`
     ${pageHeader(config, actions)}
     <div class="toolbar">
@@ -746,13 +746,11 @@ async function renderDoctors(config) {
       ${doctorsTable(doctors)}
     </div>
     <br>
-    <div class="grid two">
-      <div class="panel">
-        <div class="panel-header"><h2 class="panel-title">Receptionists</h2></div>
-        ${receptionistsTable(receptionists)}
-      </div>
-      ${can(["admin"]) ? receptionistForm() : ""}
-    </div>`;
+    <div class="panel">
+      <div class="panel-header"><h2 class="panel-title">Receptionists</h2></div>
+      ${receptionistsTable(receptionists)}
+    </div>
+    ${can(["admin"]) ? staffFormModal() : ""}`;
 }
 
 function doctorsTable(doctors) {
@@ -801,22 +799,47 @@ function receptionistsTable(receptionists) {
     </div>`;
 }
 
-function receptionistForm() {
+function staffFormModal() {
   return html`
-    <div class="panel pad" id="staffFormPanel">
-      <h2 class="panel-title">Add Receptionist</h2>
-      <br>
-      <form id="staffUserForm">
-        <input type="hidden" name="staffType" value="receptionist">
-        <div class="form-grid">
-          ${field("Full Name", "displayName")}
-          ${field("Email", "email", "", "email")}
-          ${field("Temporary Password", "temporaryPassword", "", "password")}
-          ${field("Department", "department", "Front Desk")}
-          ${selectField("Status", "active", ["true", "false"], "true")}
+    <div class="modal-backdrop" id="staffModal" hidden>
+      <div class="modal-window" role="dialog" aria-modal="true" aria-labelledby="staffModalTitle">
+        <div class="modal-header">
+          <div>
+            <h2 class="panel-title" id="staffModalTitle">Add Staff</h2>
+            <p class="panel-subtitle">Create a doctor or receptionist account.</p>
+          </div>
+          <button class="icon-button" type="button" data-close-staff-modal aria-label="Close">${icons.close}</button>
         </div>
-        <div class="form-actions"><button class="btn primary" type="submit">Create Receptionist</button></div>
-      </form>
+        <form id="staffUserForm">
+          <section class="form-section">
+            <h3>Account</h3>
+            <div class="form-grid">
+              <div class="field"><label>Role</label><select name="staffType" id="staffRoleSelect"><option value="doctor">Doctor</option><option value="receptionist">Receptionist</option></select></div>
+              <div class="field"><label>Full Name</label><input name="displayName" required></div>
+              <div class="field"><label>Email</label><input name="email" type="email" required></div>
+              <div class="field"><label>Temporary Password</label><input name="temporaryPassword" type="password" minlength="8" required></div>
+              <div class="field"><label>Department</label><input name="department" id="staffDepartment" value="General"></div>
+              <div class="field"><label>Status</label><select name="active"><option value="true">Active</option><option value="false">Disabled</option></select></div>
+            </div>
+          </section>
+          <section class="form-section" id="staffDoctorFields">
+            <h3>Doctor Profile</h3>
+            <div class="form-grid">
+              <div class="field"><label>Specialty</label><input name="specialty" value="General Medicine"></div>
+              <div class="field"><label>Phone Number</label><input name="phone"></div>
+              <div class="field"><label>Office Room</label><input name="room"></div>
+              <div class="field"><label>Available Days</label><input name="availability" value="Mon-Fri"></div>
+              <div class="field"><label>Start Time</label><input name="startTime" type="time" value="08:00"></div>
+              <div class="field"><label>End Time</label><input name="endTime" type="time" value="16:00"></div>
+              <div class="field"><label>Doctor Status</label><select name="status"><option>Available</option><option>Busy</option><option>Off Duty</option></select></div>
+            </div>
+          </section>
+          <div class="form-actions">
+            <button class="btn" type="button" data-close-staff-modal>Cancel</button>
+            <button class="btn primary" type="submit">Create Staff</button>
+          </div>
+        </form>
+      </div>
     </div>`;
 }
 
@@ -1322,24 +1345,84 @@ function bindPageBehavior() {
 
   bindRecordForm("#settingsForm", "settings", async (data) => data, pageUrl("settings"));
 
+  const staffModal = document.getElementById("staffModal");
+  const staffRoleSelect = document.getElementById("staffRoleSelect");
+  const staffDoctorFields = document.getElementById("staffDoctorFields");
+  const staffDepartment = document.getElementById("staffDepartment");
+  function setStaffModalOpen(open) {
+    if (!staffModal) return;
+    staffModal.hidden = !open;
+  }
+  function syncStaffRoleFields() {
+    const role = staffRoleSelect?.value === "receptionist" ? "receptionist" : "doctor";
+    if (staffDoctorFields) staffDoctorFields.hidden = role !== "doctor";
+    if (staffDepartment && (!staffDepartment.value || ["General", "Front Desk"].includes(staffDepartment.value))) {
+      staffDepartment.value = role === "doctor" ? "General" : "Front Desk";
+    }
+  }
+  document.getElementById("openStaffModal")?.addEventListener("click", () => setStaffModalOpen(true));
+  document.querySelectorAll("[data-close-staff-modal]").forEach((button) => {
+    button.addEventListener("click", () => setStaffModalOpen(false));
+  });
+  staffModal?.addEventListener("mousedown", (event) => {
+    if (event.target === staffModal) setStaffModalOpen(false);
+  });
+  staffRoleSelect?.addEventListener("change", syncStaffRoleFields);
+  syncStaffRoleFields();
+
   const staffForm = document.getElementById("staffUserForm");
   staffForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = formPayload(staffForm);
+    const staffType = data.staffType === "receptionist" ? "receptionist" : "doctor";
+    const temporaryPassword = String(data.temporaryPassword || "").trim();
+    if (temporaryPassword.length < 8) {
+      toast("Temporary password must be at least 8 characters.");
+      return;
+    }
     const button = staffForm.querySelector("[type=submit]");
     button.disabled = true;
     try {
       const createStaffUser = httpsCallable(functions, "createStaffUser");
       const response = await createStaffUser({
-        ...data,
+        displayName: data.displayName,
+        email: data.email,
+        temporaryPassword,
+        staffType,
+        department: data.department || (staffType === "doctor" ? data.specialty || "General" : "Front Desk"),
         active: data.active === "true",
         clinicId: state.clinicId,
       });
-      await writeAudit("Created", "Staff User", response.data?.uid || data.email, { email: data.email, staffType: data.staffType });
-      toast("Staff user created in Auth and RTD registration.");
+      const uid = response.data?.uid;
+      if (!uid) throw new Error("Firebase Auth did not return a staff user id.");
+
+      if (staffType === "doctor") {
+        await saveRecord("doctors", {
+          uid,
+          fullName: data.displayName || data.email,
+          displayName: data.displayName || data.email,
+          email: data.email,
+          phone: data.phone || "",
+          room: data.room || "",
+          specialty: data.specialty || "General Medicine",
+          department: data.department || data.specialty || "General",
+          status: data.status || "Available",
+          availability: data.availability || "",
+          startTime: data.startTime || "",
+          endTime: data.endTime || "",
+          role: "doctor",
+          staffType: "doctor",
+          active: data.active === "true",
+          assignedPatients: 0,
+        }, uid);
+      } else {
+        await writeAudit("Created", "Staff User", uid || data.email, { email: data.email, staffType });
+      }
+
+      toast(`${staffType === "doctor" ? "Doctor" : "Receptionist"} account created.`);
       setTimeout(() => window.location.reload(), 900);
     } catch (error) {
-      toast(error.message || "Could not create staff user.");
+      toast(error.message || "Could not create staff member.");
     } finally {
       button.disabled = false;
     }

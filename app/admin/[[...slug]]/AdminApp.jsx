@@ -1111,9 +1111,12 @@ function staffSearchText(record = {}, role = "") {
   ].filter(Boolean).join(" ").toLowerCase();
 }
 
-function StaffPage({ config, data, navigate, removeRecord, profile, deletingKey, notify }) {
+function StaffPage({ config, data, navigate, saveRecord, removeRecord, profile, deletingKey, notify }) {
   const [search, setSearch] = useState("");
   const [receptionists, setReceptionists] = useState([]);
+  const [createdDoctors, setCreatedDoctors] = useState([]);
+  const [staffDialogOpen, setStaffDialogOpen] = useState(false);
+  const [staffRole, setStaffRole] = useState("doctor");
   const [busy, setBusy] = useState("");
   const canEdit = profile.role === "admin";
   const term = search.toLowerCase();
@@ -1123,8 +1126,8 @@ function StaffPage({ config, data, navigate, removeRecord, profile, deletingKey,
   }, [data.users]);
 
   const doctors = useMemo(() => (
-    data.doctors.filter((doctor) => staffSearchText(doctor, "doctor").includes(term))
-  ), [data.doctors, term]);
+    [...data.doctors, ...createdDoctors].filter((doctor) => staffSearchText(doctor, "doctor").includes(term))
+  ), [createdDoctors, data.doctors, term]);
 
   const filteredReceptionists = useMemo(() => (
     receptionists.filter((item) => staffSearchText(item, "receptionist").includes(term))
@@ -1135,34 +1138,66 @@ function StaffPage({ config, data, navigate, removeRecord, profile, deletingKey,
     setReceptionists(rows.filter((user) => normalizeRole(user.role || user.staffType) === "receptionist"));
   }
 
-  async function handleReceptionistSubmit(event) {
+  async function handleStaffSubmit(event) {
     event.preventDefault();
     const form = event.currentTarget;
     const payload = Object.fromEntries(new FormData(form).entries());
+    const role = payload.staffType === "receptionist" ? "receptionist" : "doctor";
     const temporaryPassword = String(payload.temporaryPassword || "").trim();
     if (temporaryPassword.length < 8) {
       notify("Temporary password must be at least 8 characters.");
       return;
     }
 
-    setBusy("create-receptionist");
+    setBusy("create-staff");
     try {
       const createStaffUser = httpsCallable(functions, "createStaffUser");
-      await createStaffUser({
+      const response = await createStaffUser({
         displayName: payload.displayName,
         email: payload.email,
         temporaryPassword,
-        staffType: "receptionist",
-        department: payload.department || "Front Desk",
+        staffType: role,
+        department: payload.department || (role === "doctor" ? payload.specialty || "General" : "Front Desk"),
         active: payload.active === "true",
         clinicId: profile.clinicId || defaultClinicId,
       });
+      const uid = response.data?.uid || "";
+      if (!uid) {
+        throw new Error("Firebase Auth did not return a staff user id.");
+      }
+
+      if (role === "doctor") {
+        const doctorRecord = {
+          uid,
+          fullName: payload.displayName || payload.email,
+          displayName: payload.displayName || payload.email,
+          email: payload.email,
+          phone: payload.phone || "",
+          room: payload.room || "",
+          specialty: payload.specialty || "General Medicine",
+          department: payload.department || payload.specialty || "General",
+          status: payload.status || "Available",
+          availability: payload.availability || "",
+          startTime: payload.startTime || "",
+          endTime: payload.endTime || "",
+          role: "doctor",
+          staffType: "doctor",
+          active: payload.active === "true",
+          assignedPatients: 0,
+        };
+        await saveRecord("doctors", doctorRecord, uid);
+        setCreatedDoctors((current) => [{ ...doctorRecord, id: uid, docId: uid }, ...current]);
+      } else {
+        await refreshReceptionists();
+      }
+
       form.reset();
-      await refreshReceptionists();
-      notify("Receptionist account created.");
+      setStaffRole("doctor");
+      setStaffDialogOpen(false);
+      notify(`${role === "doctor" ? "Doctor" : "Receptionist"} account created.`);
     } catch (error) {
-      console.error("Receptionist creation failed", error);
-      notify(error.message || "Could not create receptionist.");
+      console.error("Staff creation failed", error);
+      notify(error.message || "Could not create staff member.");
     } finally {
       setBusy("");
     }
@@ -1188,7 +1223,7 @@ function StaffPage({ config, data, navigate, removeRecord, profile, deletingKey,
 
   return (
     <>
-      <PageHeader config={config}>{canEdit ? <button className="btn primary" type="button" onClick={() => navigate("doctor-form")}>{icons.plus} Add Doctor</button> : null}</PageHeader>
+      <PageHeader config={config}>{canEdit ? <button className="btn primary" type="button" onClick={() => setStaffDialogOpen(true)}>{icons.plus} Add Staff</button> : null}</PageHeader>
       <div className="toolbar">
         <div className="search-field"><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search staff by name, role, department, email, or contact" /></div>
       </div>
@@ -1216,38 +1251,53 @@ function StaffPage({ config, data, navigate, removeRecord, profile, deletingKey,
           }}
         />
       </div>
-      <div className="grid two" style={{ marginTop: 24 }}>
-        <div className="panel">
-          <div className="panel-header"><h2 className="panel-title">Receptionists</h2></div>
-          <ResponsiveTable
-            columns={["Name", "Email", "Department", "Status", "Actions"]}
-            rows={filteredReceptionists}
-            empty="No receptionists found."
-            renderRow={(user) => {
-              const uid = user.uid || user.id || "";
-              return [
-                <Entity key="name" name={staffName(user)} note={uid} />,
-                user.email || "-",
-                user.department || user.departmentId || "-",
-                statusBadge(user.active === false || user.status === "disabled" ? "Disabled" : "Active"),
-                canEdit ? (
-                  <button className="btn small danger" type="button" disabled={uid === profile.uid || busy === `disable:${uid}`} onClick={() => handleDisableReceptionist(uid)}>
-                    {busy === `disable:${uid}` ? "Disabling..." : "Disable"}
-                  </button>
-                ) : "-",
-              ];
-            }}
-          />
-        </div>
-        {canEdit ? (
-          <div className="panel pad">
-            <h2 className="panel-title">Add Receptionist</h2>
-            <form onSubmit={handleReceptionistSubmit}>
+      <div className="panel" style={{ marginTop: 24 }}>
+        <div className="panel-header"><h2 className="panel-title">Receptionists</h2></div>
+        <ResponsiveTable
+          columns={["Name", "Email", "Department", "Status", "Actions"]}
+          rows={filteredReceptionists}
+          empty="No receptionists found."
+          renderRow={(user) => {
+            const uid = user.uid || user.id || "";
+            return [
+              <Entity key="name" name={staffName(user)} note={uid} />,
+              user.email || "-",
+              user.department || user.departmentId || "-",
+              statusBadge(user.active === false || user.status === "disabled" ? "Disabled" : "Active"),
+              canEdit ? (
+                <button className="btn small danger" type="button" disabled={uid === profile.uid || busy === `disable:${uid}`} onClick={() => handleDisableReceptionist(uid)}>
+                  {busy === `disable:${uid}` ? "Disabling..." : "Disable"}
+                </button>
+              ) : "-",
+            ];
+          }}
+        />
+      </div>
+      {canEdit && staffDialogOpen ? (
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setStaffDialogOpen(false);
+        }}>
+          <div className="modal-window" role="dialog" aria-modal="true" aria-labelledby="staff-dialog-title">
+            <div className="modal-header">
+              <div>
+                <h2 className="panel-title" id="staff-dialog-title">Add Staff</h2>
+                <p className="panel-subtitle">Create a doctor or receptionist account.</p>
+              </div>
+              <button className="icon-button" type="button" aria-label="Close" onClick={() => setStaffDialogOpen(false)}>{icons.close}</button>
+            </div>
+            <form onSubmit={handleStaffSubmit}>
               <FormSection title="Account">
+                <div className="field">
+                  <label>Role</label>
+                  <select name="staffType" value={staffRole} onChange={(event) => setStaffRole(event.target.value)}>
+                    <option value="doctor">Doctor</option>
+                    <option value="receptionist">Receptionist</option>
+                  </select>
+                </div>
                 <Field label="Full Name" name="displayName" required />
                 <Field label="Email" name="email" type="email" required />
                 <Field label="Temporary Password" name="temporaryPassword" type="password" required minLength={8} />
-                <Field label="Department" name="department" defaultValue="Front Desk" />
+                <Field key={staffRole} label="Department" name="department" defaultValue={staffRole === "doctor" ? "General" : "Front Desk"} />
                 <div className="field">
                   <label>Status</label>
                   <select name="active" defaultValue="true">
@@ -1256,13 +1306,32 @@ function StaffPage({ config, data, navigate, removeRecord, profile, deletingKey,
                   </select>
                 </div>
               </FormSection>
+              {staffRole === "doctor" ? (
+                <FormSection title="Doctor Profile">
+                  <Field label="Specialty" name="specialty" defaultValue="General Medicine" />
+                  <Field label="Phone Number" name="phone" />
+                  <Field label="Office Room" name="room" />
+                  <Field label="Available Days" name="availability" defaultValue="Mon-Fri" />
+                  <Field label="Start Time" name="startTime" type="time" defaultValue="08:00" />
+                  <Field label="End Time" name="endTime" type="time" defaultValue="16:00" />
+                  <div className="field">
+                    <label>Doctor Status</label>
+                    <select name="status" defaultValue="Available">
+                      <option value="Available">Available</option>
+                      <option value="Busy">Busy</option>
+                      <option value="Off Duty">Off Duty</option>
+                    </select>
+                  </div>
+                </FormSection>
+              ) : null}
               <div className="form-actions">
-                <button className="btn primary" type="submit" disabled={busy === "create-receptionist"}>{busy === "create-receptionist" ? "Creating..." : "Create Receptionist"}</button>
+                <button className="btn" type="button" onClick={() => setStaffDialogOpen(false)}>Cancel</button>
+                <button className="btn primary" type="submit" disabled={busy === "create-staff"}>{busy === "create-staff" ? "Creating..." : "Create Staff"}</button>
               </div>
             </form>
           </div>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </>
   );
 }

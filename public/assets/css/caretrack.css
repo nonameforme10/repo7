@@ -890,6 +890,44 @@ button {
   margin-top: 20px;
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(2, 6, 23, 0.72);
+  backdrop-filter: blur(14px);
+}
+
+.modal-window {
+  width: min(760px, 100%);
+  max-height: min(86vh, 840px);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(8, 13, 29, 0.98));
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+}
+
+.modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(15, 23, 42, 0.96);
+}
+
+.modal-window form {
+  padding: 22px 24px 24px;
+}
+
 .table-wrap {
   overflow-x: auto;
 }
