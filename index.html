@@ -48,12 +48,25 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem("caretrack-theme");
+        var prefersDark = matchMedia("(prefers-color-scheme: dark)").matches;
+        var theme = saved === "light" || saved === "dark" ? saved : (prefersDark ? "dark" : "light");
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      } catch (error) {
+        document.documentElement.dataset.theme = "dark";
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="public/assets/css/caretrack.css">
 </head>
 <body class="public-page">
   <nav class="public-nav">
     <a class="ct-logo ct-logo-full" href="index.html" aria-label="CareTrack">
-      <img class="ct-logo-image" src="public/assets/img/logo.png" widtrrr5r54h="168" height="64" alt="CareTrack">
+      <img class="ct-logo-image" src="public/assets/img/logo.png" width="168" height="64" alt="CareTrack">
     </a>
     <a class="btn primary" href="auth/index.html">Staff Login</a>
   </nav>

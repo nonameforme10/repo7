@@ -37,6 +37,8 @@ const state = {
   demoMode: false,
 };
 
+const FIRESTORE_TIMEOUT_MS = 2600;
+
 const roleLabels = {
   admin: "Admin",
   doctor: "Doctor",
@@ -237,6 +239,14 @@ function toast(message) {
   node.textContent = message;
   host.appendChild(node);
   setTimeout(() => node.remove(), 3600);
+}
+
+function withTimeout(promise, message = "CareTrack data source timed out.") {
+  let timer = 0;
+  const timeout = new Promise((_, reject) => {
+    timer = window.setTimeout(() => reject(new Error(message)), FIRESTORE_TIMEOUT_MS);
+  });
+  return Promise.race([promise, timeout]).finally(() => window.clearTimeout(timer));
 }
 
 function redirectToLogin() {
@@ -464,7 +474,10 @@ async function readDocs(name, fallback = [], options = {}) {
     if (options.where) constraints.push(where(...options.where));
     if (options.orderBy) constraints.push(orderBy(...options.orderBy));
     if (options.limit) constraints.push(limit(options.limit));
-    const snapshot = await getDocs(constraints.length ? query(base, ...constraints) : base);
+    const snapshot = await withTimeout(
+      getDocs(constraints.length ? query(base, ...constraints) : base),
+      `CareTrack ${name} data is unavailable.`
+    );
     return snapshot.docs.map((item) => {
       const data = item.data() || {};
       const legacyId = data.id && data.id !== item.id ? data.id : data.legacyId;
@@ -480,7 +493,10 @@ async function readDocs(name, fallback = [], options = {}) {
 async function readDoc(name, id, fallback = null) {
   if (!id) return fallback;
   try {
-    const snapshot = await getDoc(doc(db, "clinics", state.clinicId, name, id));
+    const snapshot = await withTimeout(
+      getDoc(doc(db, "clinics", state.clinicId, name, id)),
+      `CareTrack ${name} record is unavailable.`
+    );
     if (!snapshot.exists()) return fallback;
     const data = snapshot.data() || {};
     const legacyId = data.id && data.id !== snapshot.id ? data.id : data.legacyId;
@@ -1172,7 +1188,7 @@ function schedulesTable(schedules) {
 async function readRtdUsers() {
   try {
     const listStaffUsers = httpsCallable(functions, "listStaffUsers");
-    const response = await listStaffUsers({ clinicId: state.clinicId });
+    const response = await withTimeout(listStaffUsers({ clinicId: state.clinicId }), "Staff user service is unavailable.");
     if (Array.isArray(response.data?.users)) return response.data.users;
   } catch (error) {
     console.warn("Could not read staff users through Functions API", error);
@@ -1188,7 +1204,7 @@ async function readRtdUsers() {
   const users = [];
   for (const [staffType, path] of paths) {
     try {
-      const snapshot = await get(ref(rtdb, path));
+      const snapshot = await withTimeout(get(ref(rtdb, path)), "Registration data is unavailable.");
       if (snapshot.exists()) {
         Object.entries(snapshot.val()).forEach(([uid, value]) => {
           const role = normalizeRole(value.role || staffType);

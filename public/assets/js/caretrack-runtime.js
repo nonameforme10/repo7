@@ -5,9 +5,15 @@
   const ONLINE_INTERVAL_MS = 60000;
   const OFFLINE_INTERVAL_MS = 10000;
   const CHECK_TIMEOUT_MS = 3500;
+  const THEME_STORAGE_KEY = "caretrack-theme";
+  const THEMES = new Set(["light", "dark"]);
   const scriptUrl = document.currentScript?.src || `${window.location.origin}/assets/js/caretrack-runtime.js`;
   const SW_URL = "/sw.js";
   const logoUrl = new URL("../img/logo.png", scriptUrl).href;
+  const themeIcons = {
+    light: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>',
+    dark: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.8 6.8 0 0 0 9.8 9.8z"/></svg>',
+  };
 
   const runtime = {
     status: {
@@ -15,6 +21,13 @@
       viaServiceWorker: false,
       serviceWorkerReady: false,
       lastCheckedAt: 0,
+    },
+    theme: {
+      get current() {
+        return getCurrentTheme();
+      },
+      set: setTheme,
+      toggle: toggleTheme,
     },
     checkConnection,
     registerServiceWorker,
@@ -27,6 +40,7 @@
   let checkSequence = 0;
   let overlayReady = false;
   let overlayObserver = null;
+  let themeObserver = null;
 
   const styles = `
     html.caretrack-offline-lock,
@@ -116,6 +130,123 @@
 
   function emit(name, detail) {
     window.dispatchEvent(new CustomEvent(`caretrack:${name}`, { detail }));
+  }
+
+  function storedTheme() {
+    try {
+      const theme = window.localStorage?.getItem(THEME_STORAGE_KEY);
+      return THEMES.has(theme) ? theme : "";
+    } catch (_error) {
+      return "";
+    }
+  }
+
+  function systemTheme() {
+    return window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ? "dark" : "light";
+  }
+
+  function preferredTheme() {
+    return storedTheme() || systemTheme();
+  }
+
+  function getCurrentTheme() {
+    const theme = document.documentElement.dataset.theme;
+    return THEMES.has(theme) ? theme : preferredTheme();
+  }
+
+  function updateThemeToggles() {
+    const theme = getCurrentTheme();
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    document.querySelectorAll("[data-caretrack-theme-toggle]").forEach((button) => {
+      if (button.getAttribute("data-theme-state") !== theme) {
+        button.innerHTML = themeIcons[theme];
+        button.setAttribute("data-theme-state", theme);
+      }
+      button.title = `Switch to ${nextTheme} mode`;
+      button.setAttribute("aria-label", `Switch to ${nextTheme} mode`);
+    });
+  }
+
+  function applyTheme(theme, options = {}) {
+    const nextTheme = THEMES.has(theme) ? theme : preferredTheme();
+    document.documentElement.dataset.theme = nextTheme;
+    document.documentElement.style.colorScheme = nextTheme;
+
+    if (options.persist) {
+      try {
+        window.localStorage?.setItem(THEME_STORAGE_KEY, nextTheme);
+      } catch (_error) {
+        // Theme still applies for the current page if storage is unavailable.
+      }
+    }
+
+    updateThemeToggles();
+    emit("theme", { theme: nextTheme });
+    return nextTheme;
+  }
+
+  function setTheme(theme) {
+    return applyTheme(theme, { persist: true });
+  }
+
+  function toggleTheme() {
+    return setTheme(getCurrentTheme() === "dark" ? "light" : "dark");
+  }
+
+  function createThemeToggle() {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "theme-toggle";
+    button.setAttribute("data-caretrack-theme-toggle", "true");
+    button.addEventListener("click", toggleTheme);
+    updateThemeToggles();
+    return button;
+  }
+
+  function themeToggleTarget() {
+    return document.querySelector(".topbar-actions")
+      || document.querySelector(".public-nav")
+      || document.querySelector(".auth-card");
+  }
+
+  function mountThemeToggle() {
+    const existing = document.querySelector("[data-caretrack-theme-toggle]");
+    if (existing) {
+      updateThemeToggles();
+      return existing;
+    }
+
+    const target = themeToggleTarget();
+    if (!target) return null;
+
+    const button = createThemeToggle();
+    if (target.classList.contains("topbar-actions") && target.lastElementChild) {
+      target.insertBefore(button, target.lastElementChild);
+    } else if (target.classList.contains("auth-card") && target.firstElementChild) {
+      target.insertBefore(button, target.firstElementChild);
+    } else {
+      target.appendChild(button);
+    }
+    updateThemeToggles();
+    return button;
+  }
+
+  function watchThemeToggleTarget() {
+    if (themeObserver || !("MutationObserver" in window)) return;
+    themeObserver = new MutationObserver(() => {
+      mountThemeToggle();
+    });
+    themeObserver.observe(document.body, { childList: true, subtree: true });
+  }
+
+  function initTheme() {
+    applyTheme(preferredTheme());
+    mountThemeToggle();
+    watchThemeToggleTarget();
+
+    window.matchMedia?.("(prefers-color-scheme: dark)")?.addEventListener?.("change", () => {
+      if (!storedTheme()) applyTheme(systemTheme());
+    });
   }
 
   function ensureOverlay() {
@@ -353,6 +484,8 @@
   }
 
   async function init() {
+    initTheme();
+
     window.addEventListener("online", () => checkConnection({ force: true }));
     window.addEventListener("offline", () => {
       checkSequence += 1;
