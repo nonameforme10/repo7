@@ -68,7 +68,7 @@ const icons = {
 
 const nav = [
   { key: "dashboard", href: "admin.html", label: "Dashboard", icon: "chart", roles: ["admin", "doctor", "receptionist"], group: "Main" },
-  { key: "doctors", href: "doctors.html", label: "Staff", icon: "users", roles: ["admin", "doctor", "receptionist"], group: "Main" },
+  { key: "doctors", href: "doctors.html", label: "Staff", icon: "users", roles: ["admin"], group: "Main" },
   { key: "patients", href: "patients.html", label: "Patients", icon: "users", roles: ["admin", "doctor", "receptionist"], group: "Main" },
   { key: "diagnoses", href: "diagnoses.html", label: "Diagnoses", icon: "activity", roles: ["admin", "doctor"], group: "Main" },
   { key: "reports", href: "reports.html", label: "Reports", icon: "document", roles: ["admin", "doctor"], group: "Main" },
@@ -79,7 +79,7 @@ const nav = [
 
 const pages = {
   dashboard: { nav: "dashboard", title: "Dashboard", subtitle: "Clinic operations, records, and alerts at a glance.", roles: ["admin", "doctor", "receptionist"], render: renderDashboard },
-  doctors: { nav: "doctors", title: "Staff", subtitle: "Find doctors and receptionists by name, role, department, email, or contact details.", roles: ["admin", "doctor", "receptionist"], render: renderDoctors },
+  doctors: { nav: "doctors", title: "Staff", subtitle: "Find doctors and receptionists by name, role, department, email, or contact details.", roles: ["admin"], render: renderDoctors },
   "doctor-form": { nav: "doctors", title: "Add Doctor", subtitle: "Create or update doctor profile, specialty, contact, and availability.", roles: ["admin"], render: renderDoctorForm },
   "doctor-detail": { nav: "doctors", title: "Doctor Profile", subtitle: "Review doctor details, assigned patients, schedule, and activity.", roles: ["admin", "doctor", "receptionist"], render: renderDoctorDetail },
   patients: { nav: "patients", title: "Patients", subtitle: "View, register, and manage patient records.", roles: ["admin", "doctor", "receptionist"], render: renderPatients },
@@ -218,6 +218,15 @@ function showLoading(message = "Securing CareTrack session...") {
           <img class="ct-logo-image auth-card-logo" src="${APP_LOGO_URL}" width="154" height="58" alt="CareTrack">
         </a>
         <p class="page-subtitle">${escapeText(message)}</p>
+        <div class="skeleton-preview">
+          <div class="skeleton-bar wide"></div>
+          <div class="skeleton-row">
+            <div class="skeleton-bar card"></div>
+            <div class="skeleton-bar card"></div>
+            <div class="skeleton-bar card"></div>
+          </div>
+          <div class="skeleton-bar table"></div>
+        </div>
       </div>
     </div>`;
 }
@@ -232,6 +241,8 @@ function toast(message) {
   if (!host) {
     host = document.createElement("div");
     host.className = "toast-host";
+    host.setAttribute("role", "status");
+    host.setAttribute("aria-live", "polite");
     document.body.appendChild(host);
   }
   const node = document.createElement("div");
@@ -424,7 +435,7 @@ function renderShell(config, content) {
           <button class="icon-button mobile-menu" id="menuToggle" aria-label="Open menu">${icons.menu}</button>
           <div class="global-search">
             ${icons.search}
-            <input id="globalSearch" type="search" placeholder="Search patients, doctors, records..." autocomplete="off">
+            <input id="globalSearch" type="search" placeholder="Search patients, doctors, records..." autocomplete="off" aria-label="Global search">
           </div>
           <div class="topbar-actions">
             <button class="icon-button" title="Notifications">${icons.bell}<span class="notification-dot"></span></button>
@@ -443,7 +454,7 @@ function renderShell(config, content) {
         </section>
       </main>
     </div>
-    <div class="toast-host"></div>`;
+    <div class="toast-host" role="status" aria-live="polite"></div>`;
 
   document.getElementById("menuToggle")?.addEventListener("click", () => {
     document.getElementById("sidebar")?.classList.toggle("open");
@@ -576,7 +587,22 @@ function wireTableTools() {
   document.querySelectorAll("[data-delete-record]").forEach((button) => {
     button.addEventListener("click", async () => {
       const [name, id] = button.dataset.deleteRecord.split(":");
-      if (!name || !id || !confirm("Delete this record?")) return;
+      if (!name || !id) return;
+      if (name === "doctors") {
+        try {
+          const patients = await readDocs("patients", samples.patients);
+          const assigned = patients.filter((p) => p.assignedDoctorId === id);
+          if (assigned.length > 0) {
+            const names = assigned.slice(0, 5).map((p) => patientName(p)).join(", ");
+            const more = assigned.length > 5 ? ` and ${assigned.length - 5} more` : "";
+            toast(`Cannot delete: ${assigned.length} patient(s) assigned (${names}${more}). Reassign them first.`);
+            return;
+          }
+        } catch (err) {
+          console.warn("Could not check assigned patients", err);
+        }
+      }
+      if (!confirm("Delete this record?")) return;
       try {
         await deleteRecord(name, id);
         button.closest("tr")?.remove();
@@ -1095,10 +1121,13 @@ async function renderDiagnosisForm(config) {
           `<div class="field"><label>Assigned Doctor</label><select name="assignedDoctorId"><option value="">Auto-filled from patient</option>${doctorOptions(doctors, selectedPatient?.assignedDoctorId || diagnosis?.assignedDoctorId)}</select></div>`,
         ])}
         ${formSection("Diagnosis Details", [
-          field("ICD Code", "icdCode", diagnosis?.icdCode || ""),
-          field("Diagnosis Description", "description", diagnosis?.description || ""),
+          `<div class="field"><label>ICD Code</label><input name="icdCode" value="${escapeText(diagnosis?.icdCode || "")}" pattern="^[A-Za-z][0-9]{2}(\\.[0-9]{1,4})?$" title="Valid ICD-10 format: letter + 2 digits, optional .digits (e.g. A15.0, J18.9)" placeholder="e.g. A15.0, J18.9"></div>`,
+          `<div class="field"><label>Diagnosis Description</label><input name="description" value="${escapeText(diagnosis?.description || "")}" list="commonDiagnosesList"><datalist id="commonDiagnosesList"><option value="Hypertension"><option value="Type 2 Diabetes Mellitus"><option value="Pneumonia"><option value="Bronchitis"><option value="Asthma"><option value="Acute Migraine"><option value="Otitis Media"><option value="Influenza"><option value="Urinary Tract Infection"><option value="Gastroesophageal Reflux"><option value="Fracture"><option value="Coronary Artery Disease"><option value="Chronic Kidney Disease"><option value="Anemia"><option value="Anxiety Disorder"><option value="Depression"><option value="Allergic Rhinitis"><option value="Dermatitis"><option value="Osteoarthritis"><option value="Orthopedic aftercare"></datalist></div>`,
           selectField("Severity Level", "severity", ["Low", "Medium", "High", "Critical"], diagnosis?.severity || "Medium"),
           field("Diagnosis Date", "diagnosisDate", diagnosis?.diagnosisDate || new Date().toISOString().slice(0, 10), "date"),
+        ])}
+        ${formSection("Clinical Checks", [
+          `<fieldset class="clinical-checks-fieldset"><legend>Findings</legend><div class="checkbox-grid"><label><input type="checkbox" name="finding_fever" ${diagnosis?.finding_fever ? "checked" : ""}> Fever</label><label><input type="checkbox" name="finding_cough" ${diagnosis?.finding_cough ? "checked" : ""}> Cough</label><label><input type="checkbox" name="finding_pain" ${diagnosis?.finding_pain ? "checked" : ""}> Pain</label><label><input type="checkbox" name="finding_shortness_of_breath" ${diagnosis?.finding_shortness_of_breath ? "checked" : ""}> Shortness of breath</label><label><input type="checkbox" name="finding_fatigue" ${diagnosis?.finding_fatigue ? "checked" : ""}> Fatigue</label><label><input type="checkbox" name="finding_weight_loss" ${diagnosis?.finding_weight_loss ? "checked" : ""}> Weight loss</label></div></fieldset>`,
         ])}
         ${formSection("Clinical Notes", [
           `<div class="field full"><label>Clinical Notes</label><textarea name="clinicalNotes">${escapeText(diagnosis?.clinicalNotes || "")}</textarea><small>Diagnosis records are linked to the patient profile.</small></div>`,
@@ -1333,9 +1362,23 @@ function bindPageBehavior() {
   }, pageUrl("doctors"));
 
   bindRecordForm("#patientForm", "patients", async (data, form) => {
-    const doctors = await readDocs("doctors", samples.doctors);
+    const [doctors, existingPatients] = await Promise.all([
+      readDocs("doctors", samples.doctors),
+      readDocs("patients", samples.patients),
+    ]);
     const doctor = doctors.find((item) => item.id === data.assignedDoctorId);
     const id = valueOf(form, "id");
+    if (!id) {
+      const fullName = `${data.firstName || ""} ${data.lastName || ""}`.trim().toLowerCase();
+      const dob = data.dateOfBirth || "";
+      const duplicate = existingPatients.find((p) => {
+        const pName = `${p.firstName || ""} ${p.lastName || ""}`.trim().toLowerCase();
+        return pName === fullName && pName.length > 0 && (dob && p.dateOfBirth === dob);
+      });
+      if (duplicate && !confirm(`A patient named "${patientName(duplicate)}" with the same date of birth already exists (${duplicate.patientId || duplicate.id}). Continue registering?`)) {
+        throw new Error("Registration cancelled — possible duplicate detected.");
+      }
+    }
     return {
       ...data,
       patientId: id || `PT-${Date.now().toString().slice(-6)}`,
@@ -1346,15 +1389,26 @@ function bindPageBehavior() {
   }, (id) => pageUrl("patient-profile", { id }));
 
   bindRecordForm("#diagnosisForm", "diagnoses", async (data) => {
+    const icdCode = String(data.icdCode || "").trim();
+    if (icdCode && !/^[A-Za-z][0-9]{2}(\.[0-9]{1,4})?$/.test(icdCode)) {
+      throw new Error("Invalid ICD-10 code. Expected format: letter + 2 digits, optional .digits (e.g. A15.0, J18.9).");
+    }
     const [patients, doctors] = await Promise.all([readDocs("patients", samples.patients), readDocs("doctors", samples.doctors)]);
     const patient = patients.find((item) => item.id === data.patientId || item.patientId === data.patientId);
     const doctor = doctors.find((item) => item.id === (data.assignedDoctorId || patient?.assignedDoctorId));
     return {
       ...data,
+      icdCode: icdCode.toUpperCase(),
       patientName: patient ? patientName(patient) : "",
       assignedDoctorId: doctor?.id || "",
       assignedDoctorName: doctor ? doctorName(doctor) : "",
       followUpRequired: data.followUpRequired === "true",
+      finding_fever: data.finding_fever === "on",
+      finding_cough: data.finding_cough === "on",
+      finding_pain: data.finding_pain === "on",
+      finding_shortness_of_breath: data.finding_shortness_of_breath === "on",
+      finding_fatigue: data.finding_fatigue === "on",
+      finding_weight_loss: data.finding_weight_loss === "on",
       lastUpdated: "Just now",
     };
   }, pageUrl("diagnoses"));
@@ -1474,6 +1528,7 @@ function bindPageBehavior() {
     });
   });
 
+  initSessionTimeout();
 }
 
 async function init() {
@@ -1500,6 +1555,27 @@ async function init() {
     renderShell(config, content);
   }
   bindPageBehavior();
+}
+
+const SESSION_TIMEOUT_MS = 15 * 60 * 1000;
+let sessionTimer = 0;
+
+function resetSessionTimer() {
+  clearTimeout(sessionTimer);
+  sessionTimer = setTimeout(async () => {
+    if (state.user) {
+      toast("Session expired due to inactivity. Signing out...");
+      await signOut(auth);
+      setTimeout(() => { window.location.href = "../auth/index.html"; }, 1200);
+    }
+  }, SESSION_TIMEOUT_MS);
+}
+
+function initSessionTimeout() {
+  ["mousemove", "keydown", "scroll", "click", "touchstart"].forEach((event) => {
+    document.addEventListener(event, resetSessionTimer, { passive: true });
+  });
+  resetSessionTimer();
 }
 
 init().catch((error) => {
