@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_VERSION = "v2.8";
+const CACHE_VERSION = "v2.9";
 const HEALTH_PATHS = new Set(["/__caretrack_health", "/_caretrack_health"]);
 const PRECACHE_ASSETS = [
   "/",
@@ -128,7 +128,13 @@ self.addEventListener("activate", (event) => {
       .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_VERSION).map((key) => caches.delete(key))))
       .then(() => self.clients.claim())
       .then(() => self.clients.matchAll({ type: "window" }))
-      .then((clients) => clients.forEach((client) => client.postMessage({ type: "SW_UPDATED", version: CACHE_VERSION })))
+      .then((windowClients) => {
+        windowClients.forEach((client) => {
+          client.navigate(client.url).catch(() => {
+            client.postMessage({ type: "SW_UPDATED", version: CACHE_VERSION });
+          });
+        });
+      })
   );
 });
 
