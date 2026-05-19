@@ -499,6 +499,16 @@
     });
 
     await registerServiceWorker();
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.addEventListener("message", (event) => {
+        if (event.data?.type === "SW_UPDATED") {
+          console.log("CareTrack update detected:", event.data.version);
+          window.location.reload();
+        }
+      });
+    }
+
     await checkConnection({ force: true });
   }
 
