@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_VERSION = "v2.6";
+const CACHE_VERSION = "v2.7";
 const HEALTH_PATHS = new Set(["/__caretrack_health", "/_caretrack_health"]);
 const PRECACHE_ASSETS = [
   "/",
@@ -38,8 +38,10 @@ const PRECACHE_ASSETS = [
   "/assets/js/caretrack-runtime.js",
   "/assets/js/firebase-config.js",
   "/assets/img/logo.png",
+  "/assets/img/administrator.webp",
   "/assets/img/man-doc.webp",
   "/assets/img/woman-doc.webp",
+  "/assets/img/receptionist.webp",
   "/assets/img/patient.webp",
 ];
 
