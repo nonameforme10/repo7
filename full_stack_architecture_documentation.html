@@ -1,0 +1,1533 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CareTrack Full Stack Architecture Documentation</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f8fb;
+      --paper: #ffffff;
+      --ink: #152033;
+      --muted: #66758c;
+      --line: #dce4ef;
+      --line-strong: #bdcada;
+      --brand: #077c91;
+      --brand-dark: #07596b;
+      --accent: #10a37f;
+      --warn: #a15c00;
+      --danger: #b42318;
+      --code-bg: #eef3f8;
+      --shadow: 0 16px 40px rgba(21, 32, 51, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.58;
+    }
+
+    a {
+      color: var(--brand-dark);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    code,
+    pre {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+
+    code {
+      padding: 0.1rem 0.32rem;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: var(--code-bg);
+      font-size: 0.92em;
+    }
+
+    pre {
+      overflow: auto;
+      padding: 1rem;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #0f172a;
+      color: #e2e8f0;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+
+    .page {
+      display: grid;
+      grid-template-columns: minmax(230px, 280px) minmax(0, 1fr);
+      gap: 26px;
+      width: min(1500px, calc(100% - 36px));
+      margin: 0 auto;
+      padding: 26px 0 56px;
+    }
+
+    header.hero {
+      grid-column: 1 / -1;
+      padding: 34px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: linear-gradient(135deg, #ffffff 0%, #f4fbfc 54%, #eef8f5 100%);
+      box-shadow: var(--shadow);
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--brand);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4 {
+      margin: 0;
+      line-height: 1.18;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      max-width: 920px;
+      font-size: clamp(2rem, 4vw, 4.2rem);
+    }
+
+    h2 {
+      margin-bottom: 14px;
+      padding-bottom: 9px;
+      border-bottom: 1px solid var(--line);
+      font-size: 1.56rem;
+    }
+
+    h3 {
+      margin-top: 24px;
+      margin-bottom: 10px;
+      font-size: 1.08rem;
+    }
+
+    h4 {
+      margin-top: 18px;
+      margin-bottom: 8px;
+      font-size: 0.98rem;
+    }
+
+    p {
+      margin: 0 0 12px;
+    }
+
+    .hero p.summary {
+      max-width: 960px;
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 1.04rem;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .meta-card {
+      min-height: 94px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.78);
+    }
+
+    .meta-card strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .toc {
+      position: sticky;
+      top: 16px;
+      align-self: start;
+      max-height: calc(100vh - 32px);
+      overflow: auto;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--paper);
+      box-shadow: var(--shadow);
+    }
+
+    .toc strong {
+      display: block;
+      margin-bottom: 10px;
+      color: var(--ink);
+      font-size: 0.9rem;
+      text-transform: uppercase;
+    }
+
+    .toc a {
+      display: block;
+      padding: 6px 0;
+      border-top: 1px solid #eef2f7;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    main {
+      min-width: 0;
+    }
+
+    section {
+      margin-bottom: 24px;
+      padding: 26px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--paper);
+      box-shadow: var(--shadow);
+    }
+
+    .note,
+    .warning,
+    .success {
+      margin: 14px 0;
+      padding: 13px 15px;
+      border-left: 4px solid var(--brand);
+      border-radius: 8px;
+      background: #f2fbfd;
+      color: #244052;
+    }
+
+    .warning {
+      border-left-color: var(--warn);
+      background: #fff7ed;
+      color: #533708;
+    }
+
+    .success {
+      border-left-color: var(--accent);
+      background: #f0fdf7;
+      color: #164e3a;
+    }
+
+    .danger {
+      color: var(--danger);
+      font-weight: 700;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin: 14px 0 4px;
+    }
+
+    .flow-card {
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fbfe;
+    }
+
+    .flow-card strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--brand-dark);
+    }
+
+    table {
+      width: 100%;
+      margin: 12px 0 22px;
+      border-collapse: collapse;
+      border: 1px solid var(--line);
+      font-size: 0.93rem;
+    }
+
+    th,
+    td {
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      background: #eef6f8;
+      color: #193449;
+      font-size: 0.8rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    tbody tr:nth-child(even) td {
+      background: #fbfdff;
+    }
+
+    ul {
+      margin: 8px 0 18px 1.25rem;
+      padding: 0;
+    }
+
+    li {
+      margin: 5px 0;
+    }
+
+    .pill-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .pill {
+      padding: 6px 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #f8fbfe;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    .source {
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    .schema-block {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    footer {
+      grid-column: 1 / -1;
+      padding: 18px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    @media (max-width: 1080px) {
+      .page {
+        display: block;
+      }
+
+      .toc {
+        position: static;
+        margin-bottom: 18px;
+      }
+
+      .meta-grid,
+      .flow {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 720px) {
+      header.hero,
+      section {
+        padding: 18px;
+      }
+
+      .meta-grid,
+      .flow,
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+    }
+
+    @media print {
+      body {
+        background: #ffffff;
+      }
+
+      .page {
+        display: block;
+        width: 100%;
+        padding: 0;
+      }
+
+      .toc {
+        display: none;
+      }
+
+      header.hero,
+      section {
+        box-shadow: none;
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <p class="eyebrow">CareTrack Architecture</p>
+      <h1>Full Stack Architecture Documentation</h1>
+      <p class="summary">
+        This document describes the CareTrack website and medical records dashboard as implemented in this repository:
+        frontend routes, backend APIs, Firebase schemas, security rules, runtime behavior, deployment scripts, and the purpose of each major subsystem.
+      </p>
+      <div class="meta-grid">
+        <div class="meta-card">
+          <strong>Generated</strong>
+          May 19, 2026
+        </div>
+        <div class="meta-card">
+          <strong>Application</strong>
+          CareTrack MRMS
+        </div>
+        <div class="meta-card">
+          <strong>Primary Stack</strong>
+          Next.js, React, Express, Firebase
+        </div>
+        <div class="meta-card">
+          <strong>Firebase Project</strong>
+          <code>caretrack-badc5</code>
+        </div>
+      </div>
+    </header>
+
+    <nav class="toc" aria-label="Table of contents">
+      <strong>Contents</strong>
+      <a href="#overview">1. Overview</a>
+      <a href="#system-map">2. System Map</a>
+      <a href="#runtime-topologies">3. Runtime Topologies</a>
+      <a href="#frontend">4. Frontend Routes</a>
+      <a href="#auth">5. Auth and Access</a>
+      <a href="#api">6. API Catalogue</a>
+      <a href="#schemas">7. Data Schemas</a>
+      <a href="#workflows">8. Data Workflows</a>
+      <a href="#security">9. Security Model</a>
+      <a href="#offline">10. Offline Runtime</a>
+      <a href="#deployment">11. Build and Deployment</a>
+      <a href="#testing">12. Testing</a>
+      <a href="#notes">13. Architecture Notes</a>
+      <a href="#sources">14. Source File Map</a>
+    </nav>
+
+    <main>
+      <section id="overview">
+        <h2>1. Overview</h2>
+        <p>
+          CareTrack is a staff-only medical records management system for clinics. The public page explains the product and sends authorized staff to the login flow. The protected admin dashboard handles staff directory management, patient registration, diagnosis tracking, schedules, reports, notifications, profile images, and role-based access.
+        </p>
+        <div class="grid">
+          <div class="note">
+            <strong>Current primary application:</strong>
+            the Next.js App Router pages in <code>app/</code>, especially the React admin app at
+            <code>app/admin/[[...slug]]/AdminApp.jsx</code>.
+          </div>
+          <div class="note">
+            <strong>Compatibility layer:</strong>
+            static pages in <code>admin/</code> and scripts in <code>public/assets/js/</code> still exist and contain a Firestore-based data layer.
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Capability</th>
+              <th>Purpose</th>
+              <th>Main implementation</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Public landing page</td>
+              <td>Explain CareTrack and link staff to login.</td>
+              <td><code>app/page.jsx</code>, <code>index.html</code></td>
+            </tr>
+            <tr>
+              <td>Staff authentication</td>
+              <td>Sign in using Firebase Auth, validate staff registration, sync custom claims.</td>
+              <td><code>app/auth/[[...slug]]/page.jsx</code>, <code>public/assets/js/caretrack-auth.js</code></td>
+            </tr>
+            <tr>
+              <td>Admin dashboard</td>
+              <td>Single-page protected staff dashboard for operational workflows.</td>
+              <td><code>app/admin/[[...slug]]/AdminApp.jsx</code></td>
+            </tr>
+            <tr>
+              <td>Staff account management</td>
+              <td>Create/disable staff accounts and keep Firebase Auth custom claims synchronized.</td>
+              <td>Firebase callable functions in <code>functions/src/controllers/*.js</code></td>
+            </tr>
+            <tr>
+              <td>Clinical data storage</td>
+              <td>Store patients, diagnoses, schedules, notifications, and staff registration data.</td>
+              <td>Firebase Realtime Database, with Firestore rules/scripts retained for legacy static flows.</td>
+            </tr>
+            <tr>
+              <td>Image storage</td>
+              <td>Store patient and doctor profile photos.</td>
+              <td>Firebase Storage paths under <code>clinics/{clinic}/...</code></td>
+            </tr>
+            <tr>
+              <td>Offline shell</td>
+              <td>Cache application shell/assets and show a connectivity overlay.</td>
+              <td><code>sw.js</code>, <code>public/assets/js/caretrack-runtime.js</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="system-map">
+        <h2>2. System Map</h2>
+        <div class="flow" aria-label="High level system flow">
+          <div class="flow-card">
+            <strong>Browser</strong>
+            Public page, auth page, admin SPA, runtime script, service worker.
+          </div>
+          <div class="flow-card">
+            <strong>Next/Express</strong>
+            Serves pages, static assets, health endpoints, security headers.
+          </div>
+          <div class="flow-card">
+            <strong>Firebase Client SDK</strong>
+            Auth, RTDB reads/writes, callable functions, Storage uploads.
+          </div>
+          <div class="flow-card">
+            <strong>Firebase Backend</strong>
+            Auth users/claims, Realtime Database, Storage, Cloud Functions.
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Layer</th>
+              <th>Technology</th>
+              <th>Purpose</th>
+              <th>Key files</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Frontend application</td>
+              <td>Next.js 16, React 19</td>
+              <td>Public marketing page, login screen, protected admin single-page experience.</td>
+              <td><code>app/page.jsx</code>, <code>app/auth/[[...slug]]/page.jsx</code>, <code>app/admin/[[...slug]]/AdminApp.jsx</code></td>
+            </tr>
+            <tr>
+              <td>Custom web server</td>
+              <td>Express 5 + Next request handler</td>
+              <td>Runs the app on VPS/PM2, handles API CORS, security headers, static assets, and health endpoints.</td>
+              <td><code>server.js</code>, <code>ecosystem.config.cjs</code></td>
+            </tr>
+            <tr>
+              <td>Backend functions</td>
+              <td>Firebase Functions v2 callable functions</td>
+              <td>Privileged staff lifecycle operations that require Admin SDK access.</td>
+              <td><code>functions/src/routes/*.js</code>, <code>functions/src/controllers/*.js</code></td>
+            </tr>
+            <tr>
+              <td>Auth</td>
+              <td>Firebase Authentication</td>
+              <td>Email/password staff login, user records, and custom role claims.</td>
+              <td><code>app/lib/firebase-client.js</code>, <code>functions/src/data/firebase.js</code></td>
+            </tr>
+            <tr>
+              <td>Primary data store</td>
+              <td>Firebase Realtime Database</td>
+              <td>Registration, staff profiles, patients, diagnoses, schedules, notifications, reports, and settings.</td>
+              <td><code>rtdrules.json</code>, <code>functions/src/data/registration.js</code>, <code>AdminApp.jsx</code></td>
+            </tr>
+            <tr>
+              <td>Legacy/secondary data store</td>
+              <td>Cloud Firestore</td>
+              <td>Static admin script data layer and rules/index definitions for clinic-scoped collections.</td>
+              <td><code>firestore.rules</code>, <code>firestore.indexes.json</code>, <code>public/assets/js/caretrack-app.js</code></td>
+            </tr>
+            <tr>
+              <td>File storage</td>
+              <td>Firebase Storage</td>
+              <td>Doctor, patient, and report files with clinic-aware paths.</td>
+              <td><code>storage.rules</code>, upload helper in <code>AdminApp.jsx</code></td>
+            </tr>
+            <tr>
+              <td>Offline/runtime</td>
+              <td>Service Worker + browser runtime script</td>
+              <td>Precache key routes/assets, health checks, theme toggle, offline overlay.</td>
+              <td><code>sw.js</code>, <code>public/assets/js/caretrack-runtime.js</code></td>
+            </tr>
+            <tr>
+              <td>Deployment</td>
+              <td>Vercel, Firebase CLI, PM2, Nginx</td>
+              <td>Frontend hosting, Firebase Functions/rules, and VPS server deployment.</td>
+              <td><code>vercel.json</code>, <code>firebase.json</code>, <code>deploy.bat</code>, <code>scripts/*.sh</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="runtime-topologies">
+        <h2>3. Runtime Topologies</h2>
+        <h3>Local and VPS runtime</h3>
+        <p>
+          The app can run through the custom Express server with <code>npm run dev</code> or <code>npm start</code>. The server prepares a Next app, applies compression, adds security headers, serves static assets, exposes health/API endpoints, and passes all remaining requests to Next.
+        </p>
+        <pre><code>Browser -> Express server.js -> Next request handler -> app/ routes
+Browser -> /api/* -> Express API middleware -> JSON response or 404
+Browser -> Firebase SDK -> Auth / RTDB / Storage / callable Functions</code></pre>
+
+        <h3>Vercel runtime</h3>
+        <p>
+          <code>vercel.json</code> declares the project as a Next.js app using <code>npm run build</code>. Next route handlers serve <code>/api/health</code>, <code>/robots.txt</code>, <code>/sitemap.xml</code>, and <code>/sw.js</code> when deployed as a standard Next app.
+        </p>
+
+        <h3>Firebase Functions runtime</h3>
+        <p>
+          Cloud Functions are exported from <code>functions/src/server.js</code>, which sets <code>maxInstances: 10</code> and exports callable functions from <code>functions/src/app/next.js</code>. These functions use the Firebase Admin SDK for Auth user and custom-claim operations.
+        </p>
+
+        <div class="warning">
+          The frontend currently calls Firebase callable functions directly through the Firebase Client SDK. The Express <code>/api</code> routes are health/test utilities, not the main clinical API surface.
+        </div>
+      </section>
+
+      <section id="frontend">
+        <h2>4. Frontend Routes</h2>
+        <h3>Next.js routes</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Route</th>
+              <th>File</th>
+              <th>Purpose</th>
+              <th>Access</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>/</code></td>
+              <td><code>app/page.jsx</code></td>
+              <td>Public product/landing page with staff login link, feature summary, and structured data.</td>
+              <td>Public</td>
+            </tr>
+            <tr>
+              <td><code>/auth</code>, <code>/auth/*</code></td>
+              <td><code>app/auth/[[...slug]]/page.jsx</code></td>
+              <td>Email/password staff login, remember-me persistence, password reset, registration check, claim sync.</td>
+              <td>Public until login</td>
+            </tr>
+            <tr>
+              <td><code>/admin</code>, <code>/admin/*</code></td>
+              <td><code>app/admin/[[...slug]]/page.jsx</code> -> <code>AdminApp.jsx</code></td>
+              <td>Protected dashboard and all staff workflows. Client-side slug router maps pages inside the React app.</td>
+              <td>Authenticated active staff</td>
+            </tr>
+            <tr>
+              <td><code>/api/health</code></td>
+              <td><code>app/api/health/route.js</code></td>
+              <td>Next health endpoint returning app/service/timestamp JSON.</td>
+              <td>Public</td>
+            </tr>
+            <tr>
+              <td><code>/robots.txt</code></td>
+              <td><code>app/robots.txt/route.js</code></td>
+              <td>Reads and returns root <code>robots.txt</code> with static caching.</td>
+              <td>Public</td>
+            </tr>
+            <tr>
+              <td><code>/sitemap.xml</code></td>
+              <td><code>app/sitemap.xml/route.js</code></td>
+              <td>Reads and returns root <code>sitemap.xml</code>.</td>
+              <td>Public</td>
+            </tr>
+            <tr>
+              <td><code>/sw.js</code></td>
+              <td><code>app/sw.js/route.js</code></td>
+              <td>Reads and returns root service worker with <code>Service-Worker-Allowed: /</code>.</td>
+              <td>Public</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Admin SPA page keys</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Page key</th>
+              <th>URL</th>
+              <th>Purpose</th>
+              <th>Allowed roles</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><code>dashboard</code></td><td><code>/admin</code></td><td>Stats, staff/patient entry points, critical count.</td><td>admin, doctor, receptionist</td></tr>
+            <tr><td><code>doctors</code></td><td><code>/admin/doctors</code></td><td>Staff directory: doctors and receptionists.</td><td>admin, doctor, receptionist</td></tr>
+            <tr><td><code>doctor-form</code></td><td><code>/admin/doctor-form?id=...</code></td><td>Create/update doctor profile and account.</td><td>admin</td></tr>
+            <tr><td><code>doctor-detail</code></td><td><code>/admin/doctor-detail?id=...</code></td><td>View doctor profile, schedule, assigned patients.</td><td>admin, doctor, receptionist</td></tr>
+            <tr><td><code>patients</code></td><td><code>/admin/patients</code></td><td>Search, view, register, edit, and delete patient records.</td><td>admin, doctor, receptionist</td></tr>
+            <tr><td><code>patient-form</code></td><td><code>/admin/patient-form?id=...</code></td><td>Register/update patient demographics, contact, assignment, photo.</td><td>admin, doctor, receptionist</td></tr>
+            <tr><td><code>patient-profile</code></td><td><code>/admin/patient-profile?id=...</code></td><td>Patient detail and linked diagnosis notes.</td><td>admin, doctor, receptionist</td></tr>
+            <tr><td><code>diagnoses</code></td><td><code>/admin/diagnoses</code></td><td>Diagnosis list and delete actions.</td><td>admin, doctor</td></tr>
+            <tr><td><code>diagnosis-form</code></td><td><code>/admin/diagnosis-form?patientId=...</code></td><td>Add diagnosis, clinical findings, ICD code, severity, and status.</td><td>admin, doctor</td></tr>
+            <tr><td><code>reports</code></td><td><code>/admin/reports</code></td><td>Report view derived from diagnosis records in the React app.</td><td>admin, doctor</td></tr>
+            <tr><td><code>schedules</code></td><td><code>/admin/schedules</code></td><td>Doctor availability, rooms, and assigned patient summary.</td><td>admin, doctor, receptionist</td></tr>
+            <tr><td><code>settings</code></td><td><code>/admin/settings</code></td><td>Clinic settings form. Current React implementation displays local save toast only.</td><td>admin</td></tr>
+            <tr><td><code>access-denied</code></td><td><code>/admin/access-denied</code></td><td>Permission-denied screen.</td><td>Special public fallback</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Static compatibility pages</h3>
+        <p>
+          The <code>admin/*.html</code> and <code>auth/index.html</code> files load shared scripts from <code>public/assets/js/</code>. They are still precached by <code>sw.js</code> and tested by Playwright, but the Next React app is the newer route surface.
+        </p>
+        <div class="pill-list">
+          <span class="pill">admin/admin.html</span>
+          <span class="pill">admin/doctors.html</span>
+          <span class="pill">admin/patients.html</span>
+          <span class="pill">admin/diagnoses.html</span>
+          <span class="pill">admin/reports.html</span>
+          <span class="pill">admin/schedules.html</span>
+          <span class="pill">admin/settings.html</span>
+          <span class="pill">admin/audit-logs.html</span>
+          <span class="pill">admin/*-form.html</span>
+          <span class="pill">admin/*-profile.html</span>
+        </div>
+      </section>
+
+      <section id="auth">
+        <h2>5. Auth and Access</h2>
+        <p>
+          CareTrack uses Firebase Authentication for staff accounts. A Firebase Auth account alone is not enough: the login flow also requires a matching Realtime Database registration record and an active status. Custom claims then drive frontend navigation and security rules.
+        </p>
+
+        <h3>Login flow</h3>
+        <ol>
+          <li>Staff submits email/password on <code>/auth</code>.</li>
+          <li>Client signs in using <code>signInWithEmailAndPassword</code>.</li>
+          <li>Client searches RTDB registration paths for the signed-in UID.</li>
+          <li>If no registration exists, or the registration is disabled, the client signs out.</li>
+          <li>Client writes <code>lastLoginAt</code> and <code>lastLoginEmail</code> when allowed.</li>
+          <li>Client calls <code>syncOwnAccessClaims</code> to mirror registration into Firebase Auth custom claims.</li>
+          <li>Client refreshes the ID token and redirects to the requested admin route.</li>
+        </ol>
+
+        <h3>Custom claim schema</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Claim</th>
+              <th>Type</th>
+              <th>Allowed values</th>
+              <th>Purpose</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><code>role</code></td><td>string</td><td><code>admin</code>, <code>doctor</code>, <code>receptionist</code></td><td>Primary authorization role used by UI, Firestore, RTDB, and Storage rules.</td></tr>
+            <tr><td><code>staffType</code></td><td>string</td><td><code>admin</code>, <code>doctor</code>, <code>receptionist</code></td><td>Normalized staff category. Aliases like administrator/frontdesk/clinical are converted.</td></tr>
+            <tr><td><code>clinicId</code></td><td>string</td><td>Usually <code>default</code></td><td>Scopes clinic-aware reads/writes and Storage paths.</td></tr>
+            <tr><td><code>status</code></td><td>string</td><td><code>active</code>, <code>disabled</code></td><td>Human-readable account state.</td></tr>
+            <tr><td><code>active</code></td><td>boolean</td><td><code>true</code>, <code>false</code></td><td>Boolean account state required by security rules.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Role purpose</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Role</th>
+              <th>Primary purpose</th>
+              <th>Typical abilities</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>admin</code></td>
+              <td>Clinic system owner/manager.</td>
+              <td>Create/disable staff, edit doctors, delete records, access settings, view audit logs, manage all clinical records.</td>
+            </tr>
+            <tr>
+              <td><code>doctor</code></td>
+              <td>Clinical user who diagnoses assigned patients.</td>
+              <td>View staff/patients/schedules, create diagnoses for assigned patients, view reports.</td>
+            </tr>
+            <tr>
+              <td><code>receptionist</code></td>
+              <td>Front-desk user handling patient registration and scheduling visibility.</td>
+              <td>View staff/patients/schedules, create or update patient demographic/assignment data.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Registration lookup paths</h3>
+        <pre><code>registration/admin/{uid}
+registration/doctors/{uid}
+registration/receptionist/{uid}
+registration/clinicks/doctor/{uid}
+registration/clinicks/reception/{uid}
+access/users/{uid}      # client-side legacy lookup only</code></pre>
+      </section>
+
+      <section id="api">
+        <h2>6. API Catalogue</h2>
+        <h3>HTTP endpoints</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Endpoint</th>
+              <th>Method</th>
+              <th>Auth</th>
+              <th>Purpose</th>
+              <th>Response / behavior</th>
+              <th>Source</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>/api/health</code></td>
+              <td>GET</td>
+              <td>Public</td>
+              <td>Health check for web runtime.</td>
+              <td>Next returns <code>{ ok, app, service: "web", via: "next", timestamp }</code>. Express returns <code>{ ok, app, service: "vps-api", uptime, timestamp }</code>.</td>
+              <td><code>app/api/health/route.js</code>, <code>server.js</code></td>
+            </tr>
+            <tr>
+              <td><code>/_caretrack_health</code>, <code>/__caretrack_health</code></td>
+              <td>GET</td>
+              <td>Public</td>
+              <td>Runtime/service-worker connectivity checks.</td>
+              <td>Next rewrites to <code>/api/health</code>. Express responds with <code>{ ok: true, app: "caretrack", via: "express" }</code>.</td>
+              <td><code>next.config.js</code>, <code>server.js</code>, <code>sw.js</code></td>
+            </tr>
+            <tr>
+              <td><code>/api/echo</code></td>
+              <td>POST</td>
+              <td>Public with API CORS</td>
+              <td>Utility/test endpoint that echoes body and query.</td>
+              <td><code>{ ok, receivedAt, body, query }</code>. JSON and URL-encoded bodies limited to 1 MB.</td>
+              <td><code>server.js</code></td>
+            </tr>
+            <tr>
+              <td><code>/api/*</code></td>
+              <td>OPTIONS</td>
+              <td>Public with origin allowlist</td>
+              <td>CORS preflight for Express API routes.</td>
+              <td>Returns <code>204</code> with allowed methods <code>GET,POST,OPTIONS</code> and headers <code>Authorization,Content-Type</code>.</td>
+              <td><code>server.js</code></td>
+            </tr>
+            <tr>
+              <td><code>/api/*</code></td>
+              <td>Other unmatched</td>
+              <td>Public with API CORS</td>
+              <td>Catch-all API miss.</td>
+              <td><code>404</code> JSON: <code>{ ok: false, error: "API route not found.", path }</code>.</td>
+              <td><code>server.js</code></td>
+            </tr>
+            <tr>
+              <td><code>/sw.js</code></td>
+              <td>GET</td>
+              <td>Public</td>
+              <td>Service worker script.</td>
+              <td>JavaScript with <code>Cache-Control: no-cache</code> and <code>Service-Worker-Allowed: /</code>.</td>
+              <td><code>app/sw.js/route.js</code>, <code>server.js</code></td>
+            </tr>
+            <tr>
+              <td><code>/robots.txt</code></td>
+              <td>GET</td>
+              <td>Public</td>
+              <td>SEO robots policy.</td>
+              <td>Disallows staff/admin/API/private routes and points to sitemap.</td>
+              <td><code>robots.txt</code>, <code>app/robots.txt/route.js</code></td>
+            </tr>
+            <tr>
+              <td><code>/sitemap.xml</code></td>
+              <td>GET</td>
+              <td>Public</td>
+              <td>SEO sitemap.</td>
+              <td>Contains only the public homepage.</td>
+              <td><code>sitemap.xml</code>, <code>app/sitemap.xml/route.js</code></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Firebase callable functions</h3>
+        <p>
+          These are called with <code>httpsCallable(functions, name)</code>. They are not REST routes. All privileged functions rely on Firebase Auth context and the Admin SDK.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Function</th>
+              <th>Required auth</th>
+              <th>Input</th>
+              <th>Purpose and side effects</th>
+              <th>Return</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>syncOwnAccessClaims</code></td>
+              <td>Any signed-in staff with active registration</td>
+              <td>None</td>
+              <td>Finds the caller's RTDB registration, validates active status, mirrors role/staffType/clinicId/active into Firebase Auth custom claims, updates last login, saves <code>staffProfiles/{uid}</code>.</td>
+              <td><code>{ uid, role, staffType, clinicId, active, registrationPath }</code></td>
+            </tr>
+            <tr>
+              <td><code>syncAccessClaims</code></td>
+              <td>Admin</td>
+              <td><code>{ uid }</code></td>
+              <td>Admin-triggered claim repair for another staff user based on registration data.</td>
+              <td><code>{ uid, role, staffType, clinicId, active }</code></td>
+            </tr>
+            <tr>
+              <td><code>createStaffUser</code></td>
+              <td>Admin</td>
+              <td><code>{ email, displayName, temporaryPassword, staffType|role, active, clinicId, department }</code></td>
+              <td>Creates or updates Firebase Auth user, removes old registrations, writes normalized registration, mirrors claims, writes <code>staffProfiles/{uid}</code>. Temporary password required for new users and must be at least 8 chars.</td>
+              <td><code>{ uid, email, role, staffType, active, registrationPath }</code></td>
+            </tr>
+            <tr>
+              <td><code>setStaffRole</code></td>
+              <td>Admin</td>
+              <td><code>{ uid, email?, displayName?, staffType|role, active?, clinicId?, department? }</code></td>
+              <td>Changes role/staff type and active state, updates Auth display name/disabled flag, rewrites registration path, mirrors claims, updates staff profile.</td>
+              <td><code>{ uid, email, role, staffType, active, registrationPath }</code></td>
+            </tr>
+            <tr>
+              <td><code>disableStaffUser</code></td>
+              <td>Admin</td>
+              <td><code>{ uid, clinicId? }</code></td>
+              <td>Disables a staff account in Firebase Auth/custom claims, marks registration disabled, updates staff profile. Admins cannot disable their own account.</td>
+              <td><code>{ uid, active: false }</code></td>
+            </tr>
+            <tr>
+              <td><code>listStaffUsers</code></td>
+              <td>Admin</td>
+              <td>Optional <code>{ clinicId }</code> from client. Controller currently lists all registrations and client filters by clinic.</td>
+              <td>Reads known registration groups and returns deduplicated staff records sorted by display name/email/uid.</td>
+              <td><code>{ users: [...] }</code></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>API CORS allowlist</h3>
+        <p>
+          Express API CORS allows credentials for origins from <code>API_ALLOWED_ORIGINS</code> or the defaults:
+          <code>https://caretrack.website</code>, <code>https://www.caretrack.website</code>,
+          <code>https://project-xbo8a.vercel.app</code>, <code>http://localhost:3000</code>, and <code>http://localhost:4173</code>.
+        </p>
+      </section>
+
+      <section id="schemas">
+        <h2>7. Data Schemas</h2>
+        <div class="warning">
+          Current React admin screens read and write Realtime Database paths. The static admin script still reads and writes Firestore collections under <code>clinics/{clinic}</code>. Both schema families are documented because both exist in the codebase.
+        </div>
+
+        <h3>7.1 Firebase Auth user schema</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Field</th>
+              <th>Type</th>
+              <th>Purpose</th>
+              <th>Writer</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><code>uid</code></td><td>string</td><td>Canonical staff identity and record key.</td><td>Firebase Auth</td></tr>
+            <tr><td><code>email</code></td><td>string</td><td>Login email and staff contact email.</td><td><code>createStaffUser</code></td></tr>
+            <tr><td><code>displayName</code></td><td>string</td><td>Name shown in the app and copied into registration/profile records.</td><td><code>createStaffUser</code>, <code>setStaffRole</code></td></tr>
+            <tr><td><code>disabled</code></td><td>boolean</td><td>Firebase Auth account enable/disable flag. Inverse of active.</td><td><code>updateAuthUser</code></td></tr>
+            <tr><td><code>emailVerified</code></td><td>boolean</td><td>Created as <code>false</code> for new staff accounts.</td><td><code>createAuthUser</code></td></tr>
+            <tr><td><code>customClaims</code></td><td>object</td><td>Role, staff type, clinic, active state.</td><td><code>mirrorClaims</code></td></tr>
+          </tbody>
+        </table>
+
+        <h3>7.2 Realtime Database schemas</h3>
+        <p>
+          The React admin app uses root-level RTDB collections plus a <code>clinicId</code> field for filtering. Doctor records are stored under registration paths, while patient/diagnosis/schedule/notification/report/settings records are root collections.
+        </p>
+
+        <div class="schema-block">
+          <h4>Registration: <code>registration/admin/{uid}</code>, <code>registration/doctors/{uid}</code>, <code>registration/receptionist/{uid}</code></h4>
+          <p class="source">Also reads legacy paths <code>registration/clinicks/doctor/{uid}</code> and <code>registration/clinicks/reception/{uid}</code>.</p>
+          <table>
+            <thead>
+              <tr><th>Field</th><th>Type</th><th>Required</th><th>Purpose</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>uid</code></td><td>string</td><td>Yes</td><td>Firebase Auth UID and RTDB key.</td></tr>
+              <tr><td><code>email</code></td><td>string</td><td>Admin path yes; other paths usually yes</td><td>Staff email/login identifier.</td></tr>
+              <tr><td><code>displayName</code></td><td>string</td><td>No</td><td>Name shown in UI.</td></tr>
+              <tr><td><code>active</code></td><td>boolean</td><td>Yes</td><td>Controls access and claim generation.</td></tr>
+              <tr><td><code>status</code></td><td>string</td><td>No</td><td><code>active</code> or <code>disabled</code>.</td></tr>
+              <tr><td><code>role</code></td><td>string</td><td>Yes</td><td>Authorization role.</td></tr>
+              <tr><td><code>staffType</code></td><td>string</td><td>Yes</td><td>Normalized staff type.</td></tr>
+              <tr><td><code>clinicId</code></td><td>string</td><td>Yes</td><td>Clinic scope. Defaults to <code>default</code>.</td></tr>
+              <tr><td><code>department</code>, <code>departmentId</code></td><td>string</td><td>No</td><td>Staff department or front desk group.</td></tr>
+              <tr><td><code>createdBy</code>, <code>updatedBy</code></td><td>string</td><td>No</td><td>Actor UID for lifecycle tracking.</td></tr>
+              <tr><td><code>createdAt</code>, <code>updatedAt</code></td><td>RTDB timestamp</td><td>No</td><td>Server-side lifecycle timestamps.</td></tr>
+              <tr><td><code>lastLoginAt</code>, <code>lastLoginEmail</code></td><td>timestamp/string</td><td>No</td><td>Updated during login/claim sync.</td></tr>
+              <tr><td><code>disabledAt</code></td><td>timestamp</td><td>No</td><td>Set when staff is disabled.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="schema-block">
+          <h4>Doctor profile: <code>registration/doctors/{uid}</code></h4>
+          <p>
+            The current React admin app stores doctor profile fields on the same RTDB registration record as access fields. It also reads legacy doctor records from <code>registration/clinicks/doctor/{uid}</code>.
+          </p>
+          <table>
+            <thead>
+              <tr><th>Field</th><th>Type</th><th>Purpose</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>uid</code>, <code>id</code></td><td>string</td><td>Doctor UID/document key.</td></tr>
+              <tr><td><code>fullName</code>, <code>displayName</code></td><td>string</td><td>Doctor name.</td></tr>
+              <tr><td><code>email</code>, <code>phone</code></td><td>string</td><td>Contact and Auth identity.</td></tr>
+              <tr><td><code>gender</code></td><td>string</td><td><code>Male</code>, <code>Female</code>, <code>Other</code>; used for default photo choice.</td></tr>
+              <tr><td><code>specialty</code>, <code>department</code></td><td>string</td><td>Clinical specialty and department.</td></tr>
+              <tr><td><code>room</code>, <code>officeRoom</code></td><td>string</td><td>Clinic room display.</td></tr>
+              <tr><td><code>status</code></td><td>string</td><td><code>Available</code>, <code>Busy</code>, or <code>Off Duty</code>.</td></tr>
+              <tr><td><code>availability</code></td><td>string</td><td>Human-readable days such as <code>Mon-Fri</code>.</td></tr>
+              <tr><td><code>startTime</code>, <code>endTime</code></td><td>HH:mm string</td><td>Working hours.</td></tr>
+              <tr><td><code>assignedPatients</code></td><td>number</td><td>Display count when stored; actual assignment can be derived from patients.</td></tr>
+              <tr><td><code>photoUrl</code>, <code>photoPath</code></td><td>string</td><td>Firebase Storage profile image URL/path.</td></tr>
+              <tr><td><code>role</code>, <code>staffType</code>, <code>active</code>, <code>clinicId</code></td><td>mixed</td><td>Access fields inherited from registration schema.</td></tr>
+              <tr><td><code>createdAt</code>, <code>createdBy</code>, <code>updatedAt</code>, <code>updatedBy</code></td><td>mixed</td><td>Lifecycle metadata from <code>saveRecord</code>.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="schema-block">
+          <h4>Staff profile mirror: <code>staffProfiles/{uid}</code></h4>
+          <table>
+            <thead>
+              <tr><th>Field</th><th>Type</th><th>Purpose</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>uid</code>, <code>email</code>, <code>displayName</code></td><td>string</td><td>Staff identity mirror.</td></tr>
+              <tr><td><code>role</code>, <code>staffType</code>, <code>active</code>, <code>status</code></td><td>mixed</td><td>Current access state.</td></tr>
+              <tr><td><code>department</code>, <code>departmentId</code></td><td>string</td><td>Staff department.</td></tr>
+              <tr><td><code>clinicId</code></td><td>string</td><td>Clinic scope.</td></tr>
+              <tr><td><code>registrationPath</code></td><td>string</td><td>RTDB registration source path.</td></tr>
+              <tr><td><code>lastLoginAt</code></td><td>timestamp</td><td>Most recent claim-sync login time.</td></tr>
+              <tr><td><code>updatedAt</code>, <code>updatedBy</code></td><td>mixed</td><td>Lifecycle metadata.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="schema-block">
+          <h4>Patients: <code>patients/{patientRecordId}</code></h4>
+          <table>
+            <thead>
+              <tr><th>Field</th><th>Type</th><th>Purpose</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>id</code>, <code>uid</code>, <code>patientId</code></td><td>string</td><td>Internal record key and public patient ID such as <code>PT-123456</code>.</td></tr>
+              <tr><td><code>firstName</code>, <code>lastName</code>, <code>fullName</code>, <code>name</code></td><td>string</td><td>Patient name. Current forms write first/last name.</td></tr>
+              <tr><td><code>dateOfBirth</code>, <code>age</code>, <code>gender</code></td><td>mixed</td><td>Demographic data.</td></tr>
+              <tr><td><code>phone</code>, <code>email</code>, <code>address</code></td><td>string</td><td>Contact information.</td></tr>
+              <tr><td><code>emergencyContactName</code>, <code>emergencyContactPhone</code></td><td>string</td><td>Allowed by Firestore rules/static model; not shown in the current React patient form.</td></tr>
+              <tr><td><code>assignedDoctorId</code>, <code>assignedDoctorName</code></td><td>string</td><td>Doctor assignment; drives diagnosis permissions and notifications.</td></tr>
+              <tr><td><code>department</code></td><td>string</td><td>Copied from assigned doctor.</td></tr>
+              <tr><td><code>status</code></td><td>string</td><td><code>Stable</code>, <code>Monitoring</code>, or <code>Critical</code>.</td></tr>
+              <tr><td><code>lastDiagnosis</code>, <code>lastUpdated</code></td><td>string</td><td>Summary fields updated after diagnosis save.</td></tr>
+              <tr><td><code>registrationNotes</code></td><td>string</td><td>Optional notes allowed by rules/static model.</td></tr>
+              <tr><td><code>photoUrl</code>, <code>photoPath</code></td><td>string</td><td>Patient profile image.</td></tr>
+              <tr><td><code>registeredBy</code>, <code>registeredByName</code></td><td>string</td><td>Staff member that created or owns registration.</td></tr>
+              <tr><td><code>clinicId</code></td><td>string</td><td>Clinic scope used by client-side filtering.</td></tr>
+              <tr><td><code>createdAt</code>, <code>createdBy</code>, <code>updatedAt</code>, <code>updatedBy</code></td><td>mixed</td><td>Lifecycle metadata.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="schema-block">
+          <h4>Diagnoses: <code>diagnoses/{diagnosisId}</code></h4>
+          <table>
+            <thead>
+              <tr><th>Field</th><th>Type</th><th>Purpose</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>id</code></td><td>string</td><td>RTDB key.</td></tr>
+              <tr><td><code>patientId</code></td><td>string</td><td>Internal patient record ID.</td></tr>
+              <tr><td><code>patientPublicId</code></td><td>string</td><td>Human-readable patient ID.</td></tr>
+              <tr><td><code>patientName</code></td><td>string</td><td>Patient display name copied at diagnosis time.</td></tr>
+              <tr><td><code>assignedDoctorId</code>, <code>assignedDoctorName</code></td><td>string</td><td>Diagnosing or assigned doctor.</td></tr>
+              <tr><td><code>department</code>, <code>specialty</code></td><td>string</td><td>Clinical department/specialty context.</td></tr>
+              <tr><td><code>description</code></td><td>string</td><td>Disease or diagnosis text.</td></tr>
+              <tr><td><code>icdCode</code></td><td>string</td><td>Optional ICD code.</td></tr>
+              <tr><td><code>severity</code></td><td>string</td><td><code>Low</code>, <code>Medium</code>, <code>High</code>, <code>Critical</code>.</td></tr>
+              <tr><td><code>diagnosisDate</code></td><td>date string</td><td>Clinical diagnosis date.</td></tr>
+              <tr><td><code>status</code></td><td>string</td><td><code>Open</code>, <code>Monitoring</code>, <code>Resolved</code>.</td></tr>
+              <tr><td><code>patientStatus</code></td><td>string</td><td>Patient-level status to summarize back onto patient record.</td></tr>
+              <tr><td><code>clinicalFindings</code></td><td>array&lt;string&gt;</td><td>Checked clinical symptoms/findings.</td></tr>
+              <tr><td><code>findingsText</code></td><td>string</td><td>Comma-separated finding summary.</td></tr>
+              <tr><td><code>clinicalNotes</code>, <code>notes</code>, <code>criticalNotes</code></td><td>string</td><td>Diagnosis notes. Render helper checks all three names.</td></tr>
+              <tr><td><code>followUpRequired</code>, <code>finding_* </code></td><td>boolean</td><td>Legacy static Firestore form fields.</td></tr>
+              <tr><td><code>clinicId</code>, <code>createdAt</code>, <code>createdBy</code>, <code>updatedAt</code>, <code>updatedBy</code></td><td>mixed</td><td>Scope and lifecycle metadata.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="schema-block">
+          <h4>Schedules: <code>schedules/{scheduleId}</code></h4>
+          <table>
+            <thead>
+              <tr><th>Field</th><th>Type</th><th>Purpose</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>id</code></td><td>string</td><td>Schedule key.</td></tr>
+              <tr><td><code>doctorId</code>, <code>assignedDoctorId</code></td><td>string</td><td>Doctor reference.</td></tr>
+              <tr><td><code>doctorName</code></td><td>string</td><td>Doctor display name.</td></tr>
+              <tr><td><code>department</code>, <code>specialty</code></td><td>string</td><td>Clinical context.</td></tr>
+              <tr><td><code>day</code></td><td>string</td><td>Weekday or availability text.</td></tr>
+              <tr><td><code>startTime</code>, <code>endTime</code></td><td>HH:mm string</td><td>Availability window.</td></tr>
+              <tr><td><code>room</code></td><td>string</td><td>Room/location.</td></tr>
+              <tr><td><code>status</code></td><td>string</td><td><code>Available</code>, <code>Busy</code>, etc.</td></tr>
+              <tr><td><code>clinicId</code>, <code>createdAt</code>, <code>createdBy</code>, <code>updatedAt</code>, <code>updatedBy</code></td><td>mixed</td><td>Scope and lifecycle metadata.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="schema-block">
+          <h4>Notifications: <code>notifications/{notificationId}</code></h4>
+          <table>
+            <thead>
+              <tr><th>Field</th><th>Type</th><th>Purpose</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>id</code></td><td>string</td><td>Notification key, usually <code>{patientRecordId}_{doctorId}_assignment</code>.</td></tr>
+              <tr><td><code>type</code></td><td>string</td><td>Currently <code>patient-assignment</code>.</td></tr>
+              <tr><td><code>title</code>, <code>message</code></td><td>string</td><td>Notification display text.</td></tr>
+              <tr><td><code>recipientUid</code>, <code>recipientName</code></td><td>string</td><td>Doctor/staff recipient.</td></tr>
+              <tr><td><code>patientRecordId</code>, <code>patientId</code>, <code>patientName</code></td><td>string</td><td>Patient target data.</td></tr>
+              <tr><td><code>department</code></td><td>string</td><td>Department context.</td></tr>
+              <tr><td><code>read</code>, <code>readAt</code></td><td>boolean/timestamp</td><td>Read state.</td></tr>
+              <tr><td><code>clinicId</code></td><td>string</td><td>Clinic scope.</td></tr>
+              <tr><td><code>createdAt</code>, <code>createdBy</code>, <code>createdByName</code></td><td>mixed</td><td>Creation metadata.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="schema-block">
+          <h4>Reports: <code>reports/{reportId}</code></h4>
+          <p>
+            The current React reports page renders diagnosis records as reports. The static script can create report metadata records.
+          </p>
+          <table>
+            <thead>
+              <tr><th>Field</th><th>Type</th><th>Purpose</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>id</code></td><td>string</td><td>Report key.</td></tr>
+              <tr><td><code>reportName</code></td><td>string</td><td>Report title, such as Patient Diagnosis Report.</td></tr>
+              <tr><td><code>subject</code></td><td>string</td><td>Patient/clinic/department subject.</td></tr>
+              <tr><td><code>createdBy</code>, <code>createdAt</code>, <code>createdAtText</code></td><td>mixed</td><td>Creator and time.</td></tr>
+              <tr><td><code>status</code></td><td>string</td><td>Report state such as <code>Ready</code>.</td></tr>
+              <tr><td><code>clinicId</code>, <code>updatedAt</code>, <code>updatedBy</code></td><td>mixed</td><td>Scope and lifecycle metadata.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="schema-block">
+          <h4>Settings: <code>settings/{settingId}</code></h4>
+          <table>
+            <thead>
+              <tr><th>Field</th><th>Type</th><th>Purpose</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>clinicName</code></td><td>string</td><td>Clinic display name.</td></tr>
+              <tr><td><code>clinicEmail</code></td><td>string</td><td>Clinic contact email in static settings model.</td></tr>
+              <tr><td><code>emergencyPhone</code></td><td>string</td><td>Emergency contact number in static settings model.</td></tr>
+              <tr><td><code>department</code>, <code>departments</code></td><td>string</td><td>Default department or comma-separated department list.</td></tr>
+              <tr><td><code>specialties</code></td><td>string</td><td>Comma-separated specialty list.</td></tr>
+              <tr><td><code>severityLabels</code></td><td>string</td><td>Diagnosis severity labels.</td></tr>
+              <tr><td><code>sessionTimeout</code></td><td>number/string</td><td>Static script session timeout setting display.</td></tr>
+              <tr><td><code>clinicId</code>, <code>updatedAt</code>, <code>updatedBy</code></td><td>mixed</td><td>Scope and lifecycle metadata if persisted.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="schema-block">
+          <h4>Access mirror: <code>access/users/{uid}</code></h4>
+          <p>
+            Client code checks this legacy path during registration lookup. RTDB rules allow reads by the user or admin and deny writes. It is not written by the current functions.
+          </p>
+        </div>
+
+        <h3>7.3 Firestore schemas</h3>
+        <p>
+          Firestore rules define a clinic-scoped document tree under <code>clinics/{clinic}</code>. The static admin script uses this shape via helpers like <code>collection(db, "clinics", state.clinicId, name)</code>.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Collection path</th>
+              <th>Main fields</th>
+              <th>Purpose</th>
+              <th>Access summary</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>clinics/{clinic}/staffProfiles/{uid}</code></td>
+              <td><code>uid</code>, <code>email</code>, <code>displayName</code>, <code>role</code>, <code>staffType</code>, <code>active</code>, <code>status</code>, <code>department</code></td>
+              <td>Clinic-scoped staff profile mirror.</td>
+              <td>Clinic staff can read; admins can create/update/delete.</td>
+            </tr>
+            <tr>
+              <td><code>clinics/{clinic}/doctors/{doctorId}</code></td>
+              <td><code>fullName</code>, <code>email</code>, <code>phone</code>, <code>specialty</code>, <code>department</code>, <code>room</code>, <code>status</code>, <code>availability</code>, <code>photoUrl</code></td>
+              <td>Firestore doctor directory for static admin pages.</td>
+              <td>Clinic staff can read; admins can write.</td>
+            </tr>
+            <tr>
+              <td><code>clinics/{clinic}/patients/{patientId}</code></td>
+              <td><code>firstName</code>, <code>lastName</code>, <code>dateOfBirth</code>, <code>age</code>, <code>gender</code>, <code>patientId</code>, <code>phone</code>, <code>email</code>, <code>address</code>, <code>assignedDoctorId</code>, <code>assignedDoctorName</code>, <code>status</code></td>
+              <td>Patient demographic and assignment records.</td>
+              <td>Clinic staff can read; admin/doctor/receptionist can create; doctors/receptionists can update only allowed demographic/assignment/status fields; admins can delete.</td>
+            </tr>
+            <tr>
+              <td><code>clinics/{clinic}/diagnoses/{diagnosisId}</code></td>
+              <td><code>patientId</code>, <code>patientName</code>, <code>assignedDoctorId</code>, <code>assignedDoctorName</code>, <code>icdCode</code>, <code>description</code>, <code>severity</code>, <code>diagnosisDate</code>, <code>clinicalNotes</code></td>
+              <td>Clinical diagnosis records linked to patients.</td>
+              <td>Admins/doctors read and create/update; admins delete.</td>
+            </tr>
+            <tr>
+              <td><code>clinics/{clinic}/schedules/{scheduleId}</code></td>
+              <td><code>doctorId</code>, <code>doctorName</code>, <code>department</code>, <code>day</code>, <code>startTime</code>, <code>endTime</code>, <code>room</code>, <code>status</code></td>
+              <td>Doctor schedule records.</td>
+              <td>Clinic staff read; admins write.</td>
+            </tr>
+            <tr>
+              <td><code>clinics/{clinic}/reports/{reportId}</code></td>
+              <td><code>reportName</code>, <code>subject</code>, <code>createdBy</code>, <code>status</code>, <code>createdAt</code></td>
+              <td>Report metadata.</td>
+              <td>Admins/doctors read/create; admins update/delete.</td>
+            </tr>
+            <tr>
+              <td><code>clinics/{clinic}/settings/{settingsId}</code></td>
+              <td><code>clinicName</code>, <code>clinicEmail</code>, <code>departments</code>, <code>specialties</code>, <code>severityLabels</code>, <code>sessionTimeout</code></td>
+              <td>Clinic settings for static admin pages.</td>
+              <td>Clinic staff read; admins write.</td>
+            </tr>
+            <tr>
+              <td><code>clinics/{clinic}/auditLogs/{auditId}</code></td>
+              <td><code>action</code>, <code>entity</code>, <code>entityId</code>, <code>details</code>, <code>userId</code>, <code>userName</code>, <code>role</code>, <code>device</code>, <code>timestamp</code></td>
+              <td>Immutable audit events from static Firestore flows.</td>
+              <td>Admins read; clinic staff can create only for their own UID/role; no updates/deletes.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>7.4 Firestore composite indexes</h3>
+        <table>
+          <thead>
+            <tr><th>Collection group</th><th>Fields</th><th>Purpose</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>doctors</code></td><td><code>department ASC</code>, <code>status ASC</code>, <code>updatedAt DESC</code></td><td>Filter staff by department/status with newest updates first.</td></tr>
+            <tr><td><code>patients</code></td><td><code>assignedDoctorId ASC</code>, <code>status ASC</code>, <code>updatedAt DESC</code></td><td>Doctor-specific patient lists.</td></tr>
+            <tr><td><code>patients</code></td><td><code>department ASC</code>, <code>status ASC</code>, <code>updatedAt DESC</code></td><td>Department patient queues.</td></tr>
+            <tr><td><code>diagnoses</code></td><td><code>patientId ASC</code>, <code>severity ASC</code>, <code>diagnosisDate DESC</code></td><td>Patient diagnosis history by severity/date.</td></tr>
+            <tr><td><code>diagnoses</code></td><td><code>assignedDoctorId ASC</code>, <code>severity ASC</code>, <code>diagnosisDate DESC</code></td><td>Doctor diagnosis worklist.</td></tr>
+            <tr><td><code>schedules</code></td><td><code>doctorId ASC</code>, <code>day ASC</code>, <code>startTime ASC</code></td><td>Ordered doctor schedules.</td></tr>
+            <tr><td><code>reports</code></td><td><code>status ASC</code>, <code>createdAt DESC</code></td><td>Report listing by status/newest.</td></tr>
+            <tr><td><code>auditLogs</code></td><td><code>action ASC</code>, <code>entity ASC</code>, <code>timestamp DESC</code></td><td>Admin audit filtering.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>7.5 Firebase Storage schemas</h3>
+        <table>
+          <thead>
+            <tr><th>Path</th><th>Purpose</th><th>Write rules</th><th>Read rules</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>clinics/{clinic}/patients/{patientId}/profile.{ext}</code></td>
+              <td>Patient profile photo uploaded from patient form.</td>
+              <td>Admin, doctor, or receptionist in same clinic.</td>
+              <td>Any active staff in same clinic.</td>
+            </tr>
+            <tr>
+              <td><code>clinics/{clinic}/doctors/{doctorId}/profile.{ext}</code></td>
+              <td>Doctor profile photo uploaded from doctor form.</td>
+              <td>Admin in same clinic.</td>
+              <td>Any active staff in same clinic.</td>
+            </tr>
+            <tr>
+              <td><code>clinics/{clinic}/reports/{allPaths}</code></td>
+              <td>Report files, when used.</td>
+              <td>Admin or doctor in same clinic.</td>
+              <td>Admin or doctor in same clinic.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="workflows">
+        <h2>8. Data Workflows</h2>
+        <h3>Staff creation</h3>
+        <ol>
+          <li>Admin opens staff or doctor form.</li>
+          <li>Client calls <code>createStaffUser</code> with email, display name, temporary password, staff type, department, active flag, and clinic ID.</li>
+          <li>Function creates/updates Firebase Auth user and removes older registration paths for that UID.</li>
+          <li>Function writes the normalized registration under the correct path and mirrors custom claims.</li>
+          <li>For doctors, the frontend then writes profile fields into <code>registration/doctors/{uid}</code>.</li>
+        </ol>
+
+        <h3>Patient registration</h3>
+        <ol>
+          <li>Staff chooses or generates a patient record key and public patient ID.</li>
+          <li>Optional profile image uploads to <code>clinics/{clinicId}/patients/{patientId}/profile.{ext}</code>.</li>
+          <li>Frontend writes <code>patients/{patientRecordId}</code> with assignment, demographics, image URL/path, clinic ID, and lifecycle metadata.</li>
+          <li>If assigned doctor changed, frontend writes a patient assignment notification under <code>notifications/{patientId}_{doctorId}_assignment</code>.</li>
+        </ol>
+
+        <h3>Diagnosis creation</h3>
+        <ol>
+          <li>Admin or assigned doctor opens diagnosis form.</li>
+          <li>Client validates that the doctor can diagnose the selected patient.</li>
+          <li>Client writes a diagnosis record under <code>diagnoses/{diagnosisId}</code>.</li>
+          <li>Client updates the patient summary fields <code>lastDiagnosis</code>, <code>status</code>, <code>updatedAt</code>, and <code>updatedBy</code>.</li>
+        </ol>
+
+        <h3>Notification handling</h3>
+        <p>
+          Doctors see notifications targeted to their UID. The app also derives assignment notifications from patient records if no explicit notification exists. Marking a notification as read updates or creates <code>read: true</code> and <code>readAt</code>.
+        </p>
+
+        <h3>Reports</h3>
+        <p>
+          The React reports page filters and renders diagnosis records as report rows. Static pages can create Firestore report metadata and render a printable patient diagnosis report.
+        </p>
+      </section>
+
+      <section id="security">
+        <h2>9. Security Model</h2>
+        <h3>Frontend access checks</h3>
+        <p>
+          The admin app checks Firebase Auth state, registration status, custom claims, and per-page role lists. Unauthorized users are redirected to <code>/auth</code> or shown the access-denied page.
+        </p>
+
+        <h3>Firestore rules summary</h3>
+        <table>
+          <thead>
+            <tr><th>Resource</th><th>Read</th><th>Create</th><th>Update</th><th>Delete</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Clinic root</td><td>Clinic staff</td><td>Admin</td><td>Admin</td><td>Admin</td></tr>
+            <tr><td>Staff profiles</td><td>Clinic staff</td><td>Admin</td><td>Admin</td><td>Admin</td></tr>
+            <tr><td>Doctors</td><td>Clinic staff</td><td>Admin</td><td>Admin</td><td>Admin</td></tr>
+            <tr><td>Patients</td><td>Clinic staff</td><td>Admin, doctor, receptionist</td><td>Admin or limited doctor/receptionist fields</td><td>Admin</td></tr>
+            <tr><td>Diagnoses</td><td>Admin, doctor</td><td>Admin, doctor</td><td>Admin, doctor</td><td>Admin</td></tr>
+            <tr><td>Schedules</td><td>Clinic staff</td><td>Admin</td><td>Admin</td><td>Admin</td></tr>
+            <tr><td>Reports</td><td>Admin, doctor</td><td>Admin, doctor</td><td>Admin</td><td>Admin</td></tr>
+            <tr><td>Settings</td><td>Clinic staff</td><td>Admin</td><td>Admin</td><td>Admin</td></tr>
+            <tr><td>Audit logs</td><td>Admin</td><td>Clinic staff for their own UID/role</td><td>Denied</td><td>Denied</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Realtime Database rules summary</h3>
+        <table>
+          <thead>
+            <tr><th>Path</th><th>Read</th><th>Write</th><th>Validation</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>registration/admin/{uid}</code></td><td>Self or admin</td><td>Admin active, or self preserving core identity/access fields</td><td>Requires <code>uid</code>, <code>email</code>, <code>active</code>, <code>role</code>, <code>staffType</code>, <code>clinicId</code></td></tr>
+            <tr><td><code>registration/doctors/{uid}</code></td><td>Self or admin; group read admin only</td><td>Admin active, or self preserving core fields</td><td>Requires <code>uid</code>, <code>active</code>, <code>role</code>, <code>staffType</code>, <code>clinicId</code></td></tr>
+            <tr><td><code>registration/receptionist/{uid}</code></td><td>Self or admin; group read active staff</td><td>Admin active, or self preserving core fields</td><td>Requires <code>uid</code>, <code>active</code>, <code>role</code>, <code>staffType</code>, <code>clinicId</code></td></tr>
+            <tr><td><code>registration/clinicks/doctor/{uid}</code>, <code>registration/clinicks/reception/{uid}</code></td><td>Self or admin; group read active staff</td><td>Admin active, or self preserving core fields</td><td>No explicit required child list in current rules.</td></tr>
+            <tr><td><code>patients/{patientId}</code></td><td>Active staff</td><td>Active admin, doctor, or receptionist</td><td>No per-field validation.</td></tr>
+            <tr><td><code>diagnoses/{diagnosisId}</code></td><td>Active admin or doctor</td><td>Active admin or doctor</td><td>No per-field validation.</td></tr>
+            <tr><td><code>schedules/{scheduleId}</code></td><td>Active staff</td><td>Active admin</td><td>No per-field validation.</td></tr>
+            <tr><td><code>notifications/{notificationId}</code></td><td>Active staff</td><td>Active admin, doctor, or receptionist</td><td>No per-field validation.</td></tr>
+            <tr><td><code>reports/{reportId}</code></td><td>Active admin or doctor</td><td>Active admin or doctor</td><td>No per-field validation.</td></tr>
+            <tr><td><code>settings/{settingId}</code></td><td>Active staff</td><td>Active admin</td><td>No per-field validation.</td></tr>
+            <tr><td><code>staffProfiles/{uid}</code></td><td>Self or admin</td><td>Self only</td><td>No per-field validation.</td></tr>
+            <tr><td><code>access/users/{uid}</code></td><td>Self or admin</td><td>Denied</td><td>Read-only legacy mirror.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Storage rules summary</h3>
+        <p>
+          Storage requires active staff claims and same-clinic matching. Patient files are writable by admins, doctors, and receptionists. Doctor files are writable only by admins. Report files are readable/writable by admins and doctors.
+        </p>
+
+        <h3>Server security headers</h3>
+        <p>
+          Both <code>server.js</code> and <code>next.config.js</code> define security headers including <code>X-Content-Type-Options: nosniff</code>, <code>X-Frame-Options: DENY</code>, <code>Referrer-Policy: strict-origin-when-cross-origin</code>, <code>Permissions-Policy</code>, and a Content Security Policy allowing Firebase, Google APIs, app assets, and Storage image sources.
+        </p>
+      </section>
+
+      <section id="offline">
+        <h2>10. Offline Runtime</h2>
+        <p>
+          CareTrack includes a service worker and runtime script to improve perceived reliability and provide visible connection status.
+        </p>
+        <table>
+          <thead>
+            <tr><th>Component</th><th>Purpose</th><th>Details</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>sw.js</code></td>
+              <td>Application shell cache and fetch strategy.</td>
+              <td>Uses cache version <code>v2.5</code>, precaches public/auth/admin routes and assets, stale-while-revalidates assets, network-first navigations, special handling for health checks.</td>
+            </tr>
+            <tr>
+              <td><code>caretrack-runtime.js</code></td>
+              <td>Browser runtime helper.</td>
+              <td>Registers service worker, checks connectivity through <code>/__caretrack_health</code>, shows offline overlay, manages light/dark theme toggle, emits runtime events.</td>
+            </tr>
+            <tr>
+              <td><code>/__caretrack_health</code></td>
+              <td>Connectivity probe.</td>
+              <td>Service worker can intercept and return JSON with <code>X-CareTrack-SW: 1</code>; runtime falls back to direct homepage fetch.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          The service worker ignores non-GET requests and lets Firebase hosts pass through to the network. It only caches same-origin assets and app shell pages.
+        </p>
+      </section>
+
+      <section id="deployment">
+        <h2>11. Build and Deployment</h2>
+        <h3>NPM scripts</h3>
+        <table>
+          <thead>
+            <tr><th>Script</th><th>Command</th><th>Purpose</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>dev</code></td><td><code>node server.js --dev</code></td><td>Run custom Express/Next server in development mode.</td></tr>
+            <tr><td><code>build</code></td><td><code>next build</code></td><td>Build Next app.</td></tr>
+            <tr><td><code>start</code></td><td><code>node server.js</code></td><td>Run custom server, using production build when present.</td></tr>
+            <tr><td><code>test:e2e</code></td><td><code>playwright test</code></td><td>Run Playwright end-to-end tests.</td></tr>
+            <tr><td><code>deploy:functions</code></td><td><code>firebase deploy --only functions</code></td><td>Deploy callable Cloud Functions.</td></tr>
+            <tr><td><code>deploy:rules</code></td><td><code>firebase deploy --only database,storage</code></td><td>Deploy RTDB and Storage rules.</td></tr>
+            <tr><td><code>deploy:hosting</code></td><td><code>firebase deploy --only hosting</code></td><td>Deploy Firebase Hosting target.</td></tr>
+            <tr><td><code>deploy:vercel:prod</code></td><td><code>vercel --prod</code></td><td>Deploy Next frontend to Vercel.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Deployment targets</h3>
+        <table>
+          <thead>
+            <tr><th>Target</th><th>Files</th><th>Purpose</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Vercel</td><td><code>vercel.json</code></td><td>Build and host the Next.js frontend.</td></tr>
+            <tr><td>Firebase</td><td><code>firebase.json</code>, <code>.firebaserc</code></td><td>Functions, Realtime Database rules, Storage rules, and optional hosting from repo root.</td></tr>
+            <tr><td>VPS/PM2</td><td><code>server.js</code>, <code>ecosystem.config.cjs</code>, <code>scripts/setup-vps.sh</code>, <code>scripts/deploy-vps.sh</code></td><td>Run the custom Express/Next server on port <code>4173</code> behind Nginx.</td></tr>
+            <tr><td>Windows deployment launcher</td><td><code>deploy.bat</code></td><td>Build validation, then opens separate deployment windows for Vercel, Firebase Functions, rules, GitHub push, and VPS deploy.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Firebase configuration</h3>
+        <pre><code>projectId: caretrack-badc5
+databaseURL: https://caretrack-badc5-default-rtdb.firebaseio.com
+storageBucket: caretrack-badc5.firebasestorage.app
+defaultClinicId: default</code></pre>
+      </section>
+
+      <section id="testing">
+        <h2>12. Testing</h2>
+        <p>
+          Playwright tests in <code>tests/e2e/caretrack.spec.js</code> validate core shell/runtime behavior:
+        </p>
+        <ul>
+          <li>Static assets and <code>sw.js</code> are served.</li>
+          <li>Public page shows the real logo and registers the service worker.</li>
+          <li>Health checks are driven through the service worker.</li>
+          <li>Connectivity overlay appears/disappears when the browser context goes offline/online.</li>
+          <li>Auth page loads without the old loader path.</li>
+          <li>Protected static admin pages redirect unauthenticated staff to login.</li>
+          <li>Access denied page renders without requiring a session.</li>
+        </ul>
+        <p>
+          Run with <code>npm run test:e2e</code> after starting the app according to <code>playwright.config.js</code>.
+        </p>
+      </section>
+
+      <section id="notes">
+        <h2>13. Architecture Notes</h2>
+        <div class="warning">
+          <strong>RTDB and Firestore both exist.</strong>
+          The current React admin app is RTDB-first, while the static admin script is Firestore-first. Keep this in mind before changing schemas or rules.
+        </div>
+        <div class="warning">
+          <strong>Firestore rules/indexes are present but not wired in <code>firebase.json</code>.</strong>
+          The configured <code>deploy:rules</code> script deploys Realtime Database and Storage rules only.
+        </div>
+        <div class="warning">
+          <strong>Functions audit writer is currently a no-op.</strong>
+          <code>functions/src/data/db.js</code> defines <code>writeAudit</code>, but the body intentionally discards its arguments. Static Firestore flows still write audit documents.
+        </div>
+        <div class="warning">
+          <strong>RTDB clinical collections are broad at the rules level.</strong>
+          Root <code>patients</code>, <code>schedules</code>, and <code>notifications</code> are readable by active staff. The React app filters by <code>clinicId</code> in client code.
+        </div>
+        <div class="note">
+          <strong>Settings persistence differs by app surface.</strong>
+          The current React settings page shows a local success toast only. The static Firestore settings form can save a <code>settings/system</code> document.
+        </div>
+        <div class="note">
+          <strong>Claim freshness matters.</strong>
+          Role changes and enable/disable operations update custom claims, but clients may need token refresh or sign-out/sign-in to pick up claim changes.
+        </div>
+      </section>
+
+      <section id="sources">
+        <h2>14. Source File Map</h2>
+        <table>
+          <thead>
+            <tr><th>Area</th><th>Files</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Next routes/layouts</td><td><code>app/layout.jsx</code>, <code>app/page.jsx</code>, <code>app/auth/[[...slug]]/page.jsx</code>, <code>app/admin/[[...slug]]/AdminApp.jsx</code>, <code>app/api/health/route.js</code></td></tr>
+            <tr><td>Firebase client SDK</td><td><code>app/lib/firebase-client.js</code>, <code>public/assets/js/firebase-config.js</code></td></tr>
+            <tr><td>Static compatibility UI</td><td><code>admin/*.html</code>, <code>auth/index.html</code>, <code>public/assets/js/caretrack-app.js</code>, <code>public/assets/js/caretrack-auth.js</code></td></tr>
+            <tr><td>Runtime/offline</td><td><code>sw.js</code>, <code>app/sw.js/route.js</code>, <code>public/assets/js/caretrack-runtime.js</code></td></tr>
+            <tr><td>Custom server</td><td><code>server.js</code>, <code>next.config.js</code>, <code>ecosystem.config.cjs</code></td></tr>
+            <tr><td>Firebase Functions</td><td><code>functions/src/server.js</code>, <code>functions/src/app.js</code>, <code>functions/src/app/next.js</code>, <code>functions/src/routes/*.js</code>, <code>functions/src/controllers/*.js</code>, <code>functions/src/data/*.js</code>, <code>functions/src/middleware/auth.js</code></td></tr>
+            <tr><td>Rules and indexes</td><td><code>rtdrules.json</code>, <code>firestore.rules</code>, <code>firestore.indexes.json</code>, <code>storage.rules</code></td></tr>
+            <tr><td>Deployment</td><td><code>firebase.json</code>, <code>.firebaserc</code>, <code>vercel.json</code>, <code>deploy.bat</code>, <code>scripts/setup-vps.sh</code>, <code>scripts/deploy-vps.sh</code></td></tr>
+            <tr><td>Tests</td><td><code>tests/e2e/caretrack.spec.js</code>, <code>playwright.config.js</code></td></tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+
+    <footer>
+      CareTrack full stack architecture documentation. Keep this file updated when routes, schemas, rules, or APIs change.
+    </footer>
+  </div>
+</body>
+</html>
