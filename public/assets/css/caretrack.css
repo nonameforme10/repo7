@@ -488,6 +488,21 @@ button {
   border-radius: 22px;
 }
 
+.avatar.role-admin {
+  background: linear-gradient(135deg, var(--cyan), var(--amber));
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--cyan) 26%, transparent);
+}
+
+.avatar.role-doctor {
+  background: linear-gradient(135deg, var(--teal), var(--blue));
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--teal) 22%, transparent);
+}
+
+.avatar.role-receptionist {
+  background: linear-gradient(135deg, var(--purple), var(--rose));
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--purple) 24%, transparent);
+}
+
 .avatar.with-photo,
 .avatar.photo-preview {
   background: var(--control-bg);

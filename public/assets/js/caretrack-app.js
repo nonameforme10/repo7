@@ -170,6 +170,35 @@ function roleBadge(role) {
   return `<span class="badge ${color}">${roleLabels[normalized] || "Staff"}</span>`;
 }
 
+function roleAvatarClass(role) {
+  const normalized = normalizeRole(role);
+  if (normalized === "admin") return "role-admin";
+  if (normalized === "doctor") return "role-doctor";
+  if (normalized === "receptionist") return "role-receptionist";
+  return "";
+}
+
+function roleColor(role) {
+  const normalized = normalizeRole(role);
+  if (normalized === "admin") return "var(--cyan)";
+  if (normalized === "doctor") return "var(--teal)";
+  if (normalized === "receptionist") return "var(--purple)";
+  return "var(--cyan)";
+}
+
+function roleAvatarImg(role, extra = "") {
+  const normalized = normalizeRole(role);
+  const imgMap = {
+    admin: "administrator.webp",
+    doctor: "man-doc.webp",
+    receptionist: "receptionist.webp",
+  };
+  const file = imgMap[normalized] || "patient.webp";
+  const src = `${assetBaseUrl}/img/${file}`;
+  const cls = `avatar with-photo ${roleAvatarClass(normalized)} ${extra}`.trim();
+  return `<span class="${cls}"><img src="${src}" alt="${roleLabels[normalized] || 'Staff'}" loading="lazy"></span>`;
+}
+
 function statusBadge(status) {
   const clean = String(status || "Active");
   const key = clean.toLowerCase();
@@ -421,10 +450,10 @@ function renderShell(config, content) {
           </nav>`).join("")}
         <div class="sidebar-footer">
           <div class="sidebar-user">
-            <span class="avatar">${initials(userName)}</span>
+            ${roleAvatarImg(profile.role)}
             <div style="min-width:0">
               <strong>${escapeText(userName)}</strong>
-              <span>${escapeText(roleLabels[profile.role] || "Staff")}</span>
+              <span style="color:${roleColor(profile.role)}">${escapeText(roleLabels[profile.role] || "Staff")}</span>
             </div>
           </div>
         </div>
@@ -440,10 +469,10 @@ function renderShell(config, content) {
           <div class="topbar-actions">
             <button class="icon-button" title="Notifications">${icons.bell}<span class="notification-dot"></span></button>
             <div class="topbar-user">
-              <span class="avatar">${initials(userName)}</span>
+              ${roleAvatarImg(profile.role)}
               <div style="min-width:0">
                 <strong>${escapeText(userName)}</strong>
-                <span>${escapeText(roleLabels[profile.role] || "Staff")}</span>
+                <span style="color:${roleColor(profile.role)}">${escapeText(roleLabels[profile.role] || "Staff")}</span>
               </div>
             </div>
             <button class="icon-button" id="signOutButton" title="Sign out">${icons.close}</button>
@@ -803,7 +832,7 @@ function doctorsTable(doctors) {
         <tbody>
           ${doctors.map((doctor) => html`
             <tr data-search-text="${escapeText(`doctor ${doctorName(doctor)} ${doctor.specialty || ""} ${doctor.department || ""} ${doctor.email || ""} ${doctor.phone || ""}`)}">
-              <td><div class="entity"><span class="avatar">${initials(doctorName(doctor))}</span><div><strong>${escapeText(doctorName(doctor))}</strong><span>${escapeText(doctor.room || doctor.officeRoom || "Room pending")}</span></div></div></td>
+              <td><div class="entity">${roleAvatarImg("doctor")}<div><strong>${escapeText(doctorName(doctor))}</strong><span>${escapeText(doctor.room || doctor.officeRoom || "Room pending")}</span></div></div></td>
               <td>${escapeText(doctor.specialty || "-")}</td>
               <td>${escapeText(doctor.department || "-")}</td>
               <td>${escapeText(doctor.phone || "-")}<br><span style="color:var(--faint)">${escapeText(doctor.email || "")}</span></td>
@@ -829,7 +858,7 @@ function receptionistsTable(receptionists) {
             const uid = user.uid || user.id || "";
             return html`
               <tr data-search-text="${escapeText(`receptionist ${staffDisplayName(user)} ${user.email || ""} ${user.department || user.departmentId || ""} ${user.phone || ""}`)}">
-                <td><div class="entity"><span class="avatar">${initials(staffDisplayName(user))}</span><div><strong>${escapeText(staffDisplayName(user))}</strong><span>${escapeText(uid)}</span></div></div></td>
+                <td><div class="entity">${roleAvatarImg("receptionist")}<div><strong>${escapeText(staffDisplayName(user))}</strong><span>${escapeText(uid)}</span></div></div></td>
                 <td>${escapeText(user.email || "-")}</td>
                 <td>${escapeText(user.department || user.departmentId || "-")}</td>
                 <td>${statusBadge(user.active === false || user.status === "disabled" ? "Disabled" : "Active")}</td>
@@ -930,7 +959,7 @@ async function renderDoctorDetail(config) {
     <div class="panel">
       <div class="profile-header">
         <div class="profile-main">
-          <span class="avatar large">${initials(doctorName(doctor))}</span>
+          ${roleAvatarImg("doctor", "large")}
           <div><h2>${escapeText(doctorName(doctor))}</h2><p>${escapeText(doctor?.specialty || "")} | ${escapeText(doctor?.department || "")}</p></div>
         </div>
         ${statusBadge(doctor?.status || "Available")}
@@ -973,7 +1002,7 @@ function patientsTable(patients, includeActions = true) {
           ${patients.map((patient) => html`
             <tr>
               <td>${escapeText(patient.patientId || patient.id)}</td>
-              <td><div class="entity"><span class="avatar">${initials(patientName(patient))}</span><div><strong>${escapeText(patientName(patient))}</strong><span>${escapeText(patient.phone || "")}</span></div></div></td>
+              <td><div class="entity">${roleAvatarImg("patient")}<div><strong>${escapeText(patientName(patient))}</strong><span>${escapeText(patient.phone || "")}</span></div></div></td>
               <td>${escapeText(patient.age || ageFromDob(patient.dateOfBirth) || "-")}</td>
               <td>${escapeText(patient.gender || "-")}</td>
               <td>${escapeText(patient.assignedDoctorName || "-")}</td>
@@ -1048,7 +1077,7 @@ async function renderPatientProfile(config) {
     ${pageHeader(config, `${can(["admin", "doctor"]) ? `<a class="btn primary" href="${pageUrl("diagnosis-form", { patientId: patient?.id || "" })}">${icons.plus} Add Diagnosis</a><a class="btn" href="${pageUrl("patient-report", { id: patient?.id || "" })}">Generate Report</a>` : ""}`)}
     <div class="panel">
       <div class="profile-header">
-        <div class="profile-main"><span class="avatar large">${initials(patientName(patient))}</span><div><h2>${escapeText(patientName(patient))}</h2><p>${escapeText(patient?.patientId || patient?.id)} | ${escapeText(patient?.age || ageFromDob(patient?.dateOfBirth) || "-")} years | ${escapeText(patient?.gender || "-")}</p></div></div>
+        <div class="profile-main">${roleAvatarImg("patient", "large")}<div><h2>${escapeText(patientName(patient))}</h2><p>${escapeText(patient?.patientId || patient?.id)} | ${escapeText(patient?.age || ageFromDob(patient?.dateOfBirth) || "-")} years | ${escapeText(patient?.gender || "-")}</p></div></div>
         ${statusBadge(patient?.status || "Stable")}
       </div>
     </div>
@@ -1059,7 +1088,7 @@ async function renderPatientProfile(config) {
         <div class="panel"><div class="panel-header"><h2 class="panel-title">Diagnosis Records</h2></div>${diagnosesTable(patientDiagnoses, false)}</div>
       </div>
       <div class="grid">
-        <div class="panel pad"><h2 class="panel-title">Assigned Doctor</h2><br><div class="entity"><span class="avatar">${initials(doctorName(doctor))}</span><div><strong>${escapeText(doctorName(doctor))}</strong><span>${escapeText(doctor?.specialty || "")} | ${escapeText(doctor?.department || "")}</span></div></div><br><div class="info-list">${infoRow("Contact", doctor?.phone)}${infoRow("Email", doctor?.email)}</div></div>
+        <div class="panel pad"><h2 class="panel-title">Assigned Doctor</h2><br><div class="entity">${roleAvatarImg("doctor")}<div><strong>${escapeText(doctorName(doctor))}</strong><span>${escapeText(doctor?.specialty || "")} | ${escapeText(doctor?.department || "")}</span></div></div><br><div class="info-list">${infoRow("Contact", doctor?.phone)}${infoRow("Email", doctor?.email)}</div></div>
         <div class="panel"><div class="panel-header"><h2 class="panel-title">Diagnosis History</h2></div><div class="timeline">${patientDiagnoses.map((item) => timelineItem(item.description || item.icdCode, `${item.severity || "Medium"} severity by ${item.assignedDoctorName || "Doctor"}`, item.diagnosisDate || "Recent")).join("") || `<div class="empty-state">No diagnosis records yet.</div>`}</div></div>
       </div>
     </div>`;
