@@ -23,8 +23,10 @@ import {
 } from "../../lib/firebase-client";
 
 const logoUrl = "/assets/img/logo.png";
+const defaultAdminUrl = "/assets/img/administrator.webp";
 const defaultDoctorManUrl = "/assets/img/man-doc.webp";
 const defaultDoctorWomanUrl = "/assets/img/woman-doc.webp";
+const defaultReceptionistUrl = "/assets/img/receptionist.webp";
 const defaultPatientUrl = "/assets/img/patient.webp";
 
 const roleLabels = {
@@ -224,6 +226,8 @@ async function buildProfile(user) {
     staffType,
     active,
     clinicId: claims.clinicId || registration?.clinicId || defaultClinicId,
+    gender: registration?.gender || claims.gender || "",
+    photoUrl: registration?.photoUrl || registration?.imageUrl || registration?.avatarUrl || user.photoURL || claims.picture || "",
   };
 }
 
@@ -257,6 +261,8 @@ function normalizeGender(value = "") {
 }
 
 function defaultProfileImage(type, gender = "") {
+  if (type === "admin") return defaultAdminUrl;
+  if (type === "receptionist") return defaultReceptionistUrl;
   if (type === "doctor") {
     return normalizeGender(gender) === "Female" ? defaultDoctorWomanUrl : defaultDoctorManUrl;
   }
@@ -264,11 +270,21 @@ function defaultProfileImage(type, gender = "") {
 }
 
 function isDefaultProfileImage(url = "") {
-  return [defaultDoctorManUrl, defaultDoctorWomanUrl, defaultPatientUrl].includes(String(url || ""));
+  return [defaultAdminUrl, defaultDoctorManUrl, defaultDoctorWomanUrl, defaultReceptionistUrl, defaultPatientUrl].includes(String(url || ""));
 }
 
 function profileImageFor(record = {}, type) {
   return record.photoUrl || record.imageUrl || record.avatarUrl || defaultProfileImage(type, record.gender);
+}
+
+function ProfileAvatar({ profile }) {
+  const name = profile.displayName || profile.email || "CareTrack Staff";
+  const avatarUrl = profileImageFor(profile, profile.staffType || profile.role);
+  return (
+    <span className="avatar with-photo">
+      <img src={avatarUrl} alt={`${name} profile`} />
+    </span>
+  );
 }
 
 function recordFromRtdValue(id, value = {}, path = "") {
@@ -860,7 +876,7 @@ export default function AdminApp() {
         ))}
         <div className="sidebar-footer">
           <div className="sidebar-user">
-            <span className="avatar">{initials(profile.displayName || profile.email)}</span>
+            <ProfileAvatar profile={profile} />
             <div style={{ minWidth: 0 }}>
               <strong>{profile.displayName || profile.email}</strong>
               <span>{roleLabels[profile.role] || "Staff"}</span>
@@ -879,7 +895,7 @@ export default function AdminApp() {
           <div className="topbar-actions">
             <NotificationBell profile={profile} navigate={navigate} notify={setToast} />
             <div className="topbar-user">
-              <span className="avatar">{initials(profile.displayName || profile.email)}</span>
+              <ProfileAvatar profile={profile} />
               <div style={{ minWidth: 0 }}>
                 <strong>{profile.displayName || profile.email}</strong>
                 <span>{roleLabels[profile.role] || "Staff"}</span>

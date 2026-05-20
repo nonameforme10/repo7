@@ -22,6 +22,24 @@ async function waitForRuntime(page) {
   await page.waitForFunction(() => window.CareTrackRuntime?.status);
 }
 
+async function evaluateWithRuntime(page, callback) {
+  let lastError;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await page.waitForLoadState("domcontentloaded");
+      await waitForRuntime(page);
+      return await page.evaluate(callback);
+    } catch (error) {
+      lastError = error;
+      const message = String(error.message || error);
+      if (!message.includes("Execution context was destroyed") && !message.includes("CareTrackRuntime")) {
+        throw error;
+      }
+    }
+  }
+  throw lastError;
+}
+
 async function serviceWorkerInfo(page) {
   return page.evaluate(async () => {
     if (!("serviceWorker" in navigator)) {
@@ -87,7 +105,7 @@ test("public page uses the real logo and registers sw.js", async ({ page }) => {
   expect(sw.controlled).toBe(true);
   expect(sw.scriptURL).toContain("/sw.js");
 
-  const health = await page.evaluate(async () => {
+  const health = await evaluateWithRuntime(page, async () => {
     await window.CareTrackRuntime.checkConnection({ force: true });
     const response = await fetch("/__caretrack_health?test=public", {
       cache: "no-store",
@@ -113,12 +131,12 @@ test("connectivity overlay is driven through the service worker", async ({ page,
   expect(sw.controlled).toBe(true);
 
   await context.setOffline(true);
-  const offlineStatus = await page.evaluate(() => window.CareTrackRuntime.checkConnection({ force: true }));
+  const offlineStatus = await evaluateWithRuntime(page, () => window.CareTrackRuntime.checkConnection({ force: true }));
   expect(offlineStatus.online).toBe(false);
   await expect(page.locator("#caretrack-offline-screen.visible")).toBeVisible();
 
   await context.setOffline(false);
-  const onlineStatus = await page.evaluate(() => window.CareTrackRuntime.checkConnection({ force: true }));
+  const onlineStatus = await evaluateWithRuntime(page, () => window.CareTrackRuntime.checkConnection({ force: true }));
   expect(onlineStatus.online).toBe(true);
   await expect(page.locator("#caretrack-offline-screen")).toBeHidden();
 });

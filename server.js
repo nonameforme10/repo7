@@ -71,7 +71,7 @@ nextApp.prepare().then(() => {
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' https://fonts.gstatic.com",
         "img-src 'self' data: blob: https://*.googleapis.com https://*.firebasestorage.app https://firebasestorage.googleapis.com",
-        "connect-src 'self' https://*.googleapis.com https://*.google.com https://*.firebaseio.com https://*.cloudfunctions.net https://*.firebasestorage.app https://firebasestorage.googleapis.com https://firebaseinstallations.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com",
+        "connect-src 'self' https://*.googleapis.com https://*.google.com https://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebaseio.com wss://*.firebasedatabase.app https://*.cloudfunctions.net https://*.firebaseapp.com https://*.firebasestorage.app https://firebasestorage.googleapis.com https://firebaseinstallations.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com",
         "frame-src 'self' https://*.firebaseapp.com https://*.google.com https://*.firebaseio.com",
         "object-src 'none'",
         "base-uri 'self'",
@@ -132,8 +132,11 @@ nextApp.prepare().then(() => {
   });
 
   server.use("/assets/img", express.static(path.join(publicDir, "assets", "img"), {
-    immutable: true,
-    maxAge: "30d",
+    etag: true,
+    maxAge: 0,
+    setHeaders(res) {
+      res.setHeader("Cache-Control", "public, max-age=0, must-revalidate");
+    },
   }));
 
   server.use("/assets", express.static(path.join(publicDir, "assets"), {

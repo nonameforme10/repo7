@@ -1,12 +1,13 @@
 "use strict";
 
-const CACHE_VERSION = "v2.9";
+const CACHE_VERSION = "v3.0";
 const HEALTH_PATHS = new Set(["/__caretrack_health", "/_caretrack_health"]);
 const PRECACHE_ASSETS = [
   "/",
   "/index.html",
   "/auth",
   "/auth/index.html",
+  "/dcd.html",
   "/admin",
   "/admin/doctors",
   "/admin/patients",
