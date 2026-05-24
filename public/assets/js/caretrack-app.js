@@ -1118,15 +1118,17 @@ function ageFromDob(dob) {
 async function renderPatientForm(config) {
   const id = getParam("id");
   const fallback = samples.patients.find((item) => item.id === id) || {};
-  const [patient, doctors, settings] = await Promise.all([
+  const [patient, storedDoctors, rtdUsers, settings] = await Promise.all([
     readDoc("patients", id, fallback),
     readDocs("doctors", samples.doctors),
+    readRtdUsers(),
     getSystemSettings(),
   ]);
   if (id && patient && !isPatientVisibleToUser(patient)) {
     redirectDenied("patient-scope");
     return "";
   }
+  const doctors = mergeDoctorSources(storedDoctors, rtdUsers);
   return html`
     ${pageHeader(config, `<a class="btn" href="${pageUrl("patients")}">Cancel</a>`)}
     <div class="panel pad">
@@ -1148,7 +1150,7 @@ async function renderPatientForm(config) {
           field("Emergency Contact Phone", "emergencyContactPhone", patient.emergencyContactPhone || ""),
         ])}
         ${formSection("Doctor Assignment", [
-          `<div class="field"><label>Assigned Doctor</label><select name="assignedDoctorId" required><option value="">Select doctor (name — specialty)</option>${doctorOptions(doctors, patient.assignedDoctorId || (state.profile?.role === "doctor" ? state.profile.uid : ""))}</select></div>`,
+          `<div class="field"><label>Assigned Doctor</label><select name="assignedDoctorId"><option value="">Select doctor (name — specialty)</option>${doctorOptions(doctors, patient.assignedDoctorId || (state.profile?.role === "doctor" ? state.profile.uid : ""))}</select></div>`,
           selectFromList("Department", "department", settings.departmentList, patient.department || ""),
           `<div class="field full"><label>Registration Notes</label><textarea name="registrationNotes">${escapeText(patient.registrationNotes || "")}</textarea></div>`,
         ])}
@@ -1243,12 +1245,14 @@ async function renderDiagnosisForm(config) {
   const id = getParam("id");
   const patientId = getParam("patientId");
   const fallback = samples.diagnoses.find((item) => item.id === id) || {};
-  const [diagnosis, allPatients, doctors, settings] = await Promise.all([
+  const [diagnosis, allPatients, storedDoctors, rtdUsers, settings] = await Promise.all([
     readDoc("diagnoses", id, fallback),
     readDocs("patients", samples.patients),
     readDocs("doctors", samples.doctors),
+    readRtdUsers(),
     getSystemSettings(),
   ]);
+  const doctors = mergeDoctorSources(storedDoctors, rtdUsers);
   const patients = filterPatientsForUser(allPatients);
   const selectedPatient = patients.find((item) => item.id === (diagnosis?.patientId || patientId) || item.patientId === (diagnosis?.patientId || patientId));
   if (diagnosis?.patientId && !selectedPatient && state.profile?.role === "doctor") {
@@ -1548,10 +1552,12 @@ function bindPageBehavior() {
   }, pageUrl("doctors"));
 
   bindRecordForm("#patientForm", "patients", async (data, form) => {
-    const [doctors, existingPatients] = await Promise.all([
+    const [storedDoctors, rtdUsers, existingPatients] = await Promise.all([
       readDocs("doctors", samples.doctors),
+      readRtdUsers(),
       readDocs("patients", samples.patients),
     ]);
+    const doctors = mergeDoctorSources(storedDoctors, rtdUsers);
     const doctor = doctors.find((item) => item.id === data.assignedDoctorId);
     const id = valueOf(form, "id");
     if (!id) {
@@ -1579,7 +1585,12 @@ function bindPageBehavior() {
     if (icdCode && !/^[A-Za-z][0-9]{2}(\.[0-9]{1,4})?$/.test(icdCode)) {
       throw new Error("Invalid ICD-10 code. Expected format: letter + 2 digits, optional .digits (e.g. A15.0, J18.9).");
     }
-    const [patients, doctors] = await Promise.all([readDocs("patients", samples.patients), readDocs("doctors", samples.doctors)]);
+    const [patients, storedDoctors, rtdUsers] = await Promise.all([
+      readDocs("patients", samples.patients),
+      readDocs("doctors", samples.doctors),
+      readRtdUsers(),
+    ]);
+    const doctors = mergeDoctorSources(storedDoctors, rtdUsers);
     const patient = patients.find((item) => item.id === data.patientId || item.patientId === data.patientId);
     const doctor = doctors.find((item) => item.id === (data.assignedDoctorId || patient?.assignedDoctorId));
     return {
