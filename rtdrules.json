@@ -11,7 +11,7 @@
         }
       },
       "doctors": {
-        ".read": "auth != null && auth.token.active === true && auth.token.role === 'admin'",
+        ".read": "auth != null && auth.token.active === true",
         "$uid": {
           ".read": "auth != null && (auth.uid === $uid || auth.token.role === 'admin')",
           ".write": "auth != null && ((auth.token.role === 'admin' && auth.token.active === true) || (auth.uid === $uid && data.exists() && newData.child('uid').val() === data.child('uid').val() && newData.child('email').val() === data.child('email').val() && newData.child('active').val() === data.child('active').val() && newData.child('role').val() === data.child('role').val() && newData.child('staffType').val() === data.child('staffType').val() && newData.child('clinicId').val() === data.child('clinicId').val()))",

@@ -1139,8 +1139,11 @@ async function readCollection(clinicId, name) {
 
     return records;
   } catch (error) {
-    console.warn(`Using sample ${name} data`, error);
-    return samples[name] || [];
+    console.warn(`RTDB ${name} read failed`, error);
+    if (typeof window !== "undefined") {
+      window.__caretrackReadError = error?.message || `Could not read ${name}`;
+    }
+    return [];
   }
 }
 
