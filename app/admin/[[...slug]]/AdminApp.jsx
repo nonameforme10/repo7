@@ -310,6 +310,101 @@ function canDiagnosePatient(patient = {}, profile = {}) {
   return patient.assignedDoctorId === profile.uid || patient.assignedDoctorName === profile.displayName;
 }
 
+function isPatientVisibleToUser(patient = {}, profile = {}) {
+  if (profile.role !== "doctor") return true;
+  return patient.assignedDoctorId === profile.uid
+    || patient.assignedDoctorName === profile.displayName
+    || patient.createdBy === profile.uid
+    || patient.registeredBy === profile.uid;
+}
+
+function filterPatientsForUser(patients = [], profile = {}) {
+  if (profile.role !== "doctor") return patients;
+  return patients.filter((patient) => isPatientVisibleToUser(patient, profile));
+}
+
+function filterDiagnosesForUser(diagnoses = [], visiblePatients = [], profile = {}) {
+  if (profile.role !== "doctor") return diagnoses;
+  const visibleIds = new Set();
+  visiblePatients.forEach((patient) => {
+    const docId = recordId(patient);
+    if (docId) visibleIds.add(docId);
+    if (patient.patientId) visibleIds.add(patient.patientId);
+  });
+  return diagnoses.filter((dx) =>
+    dx.assignedDoctorId === profile.uid
+    || dx.createdBy === profile.uid
+    || visibleIds.has(dx.patientId)
+    || visibleIds.has(dx.patientPublicId)
+  );
+}
+
+function parseList(value) {
+  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
+  return String(value || "")
+    .split(/[,;\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+const DEFAULT_SPECIALTIES = [
+  "Cardiology", "Neurology", "Pediatrics", "General Medicine",
+  "Urology", "Otolaryngology (ENT)", "Dermatology", "Orthopedics",
+  "Gynecology", "Ophthalmology", "Psychiatry", "Endocrinology",
+];
+
+const DEFAULT_DIAGNOSES_LIST = [
+  "Hypertension", "Type 2 Diabetes Mellitus", "Pneumonia", "Bronchitis",
+  "Asthma", "Acute Migraine", "Otitis Media", "Influenza",
+  "Urinary Tract Infection", "Gastroesophageal Reflux", "Fracture",
+  "Coronary Artery Disease", "Chronic Kidney Disease", "Anemia",
+  "Anxiety Disorder", "Depression", "Allergic Rhinitis", "Dermatitis",
+  "Osteoarthritis", "Orthopedic aftercare", "Tuberculosis",
+];
+
+const DEFAULT_DEPARTMENTS = [
+  "Cardiology", "Neurology", "Pediatrics", "Orthopedics", "General",
+  "Urology", "ENT", "Dermatology", "Front Desk",
+];
+
+function useSystemSettings(clinicId) {
+  const [settings, setSettings] = useState({
+    loading: true,
+    specialtyList: DEFAULT_SPECIALTIES,
+    diagnosesList: DEFAULT_DIAGNOSES_LIST,
+    departmentList: DEFAULT_DEPARTMENTS,
+    raw: {},
+  });
+
+  useEffect(() => {
+    let alive = true;
+    async function load() {
+      try {
+        const snapshot = await get(ref(rtdb, "settings/system"));
+        const raw = snapshot.exists() ? (snapshot.val() || {}) : {};
+        const specialties = parseList(raw.specialties);
+        const diagnosesList = parseList(raw.diagnosesList || raw.diagnoses);
+        const departments = parseList(raw.departments);
+        if (!alive) return;
+        setSettings({
+          loading: false,
+          raw,
+          specialtyList: specialties.length ? specialties : DEFAULT_SPECIALTIES,
+          diagnosesList: diagnosesList.length ? diagnosesList : DEFAULT_DIAGNOSES_LIST,
+          departmentList: departments.length ? departments : DEFAULT_DEPARTMENTS,
+        });
+      } catch (error) {
+        console.warn("Settings load failed", error);
+        if (alive) setSettings((current) => ({ ...current, loading: false }));
+      }
+    }
+    load();
+    return () => { alive = false; };
+  }, [clinicId]);
+
+  return settings;
+}
+
 const scheduleWeekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const scheduleDayNames = {
   mon: "Monday",
@@ -616,12 +711,12 @@ function TextArea({ label, name, defaultValue = "" }) {
   );
 }
 
-function SelectField({ label, name, options, defaultValue = "" }) {
+function SelectField({ label, name, options, defaultValue = "", placeholder = "Select" }) {
   return (
     <div className="field">
       <label>{label}</label>
       <select name={name} defaultValue={defaultValue || ""}>
-        <option value="">Select</option>
+        <option value="">{placeholder}</option>
         {options.map((option) => <option value={option} key={option}>{option}</option>)}
       </select>
     </div>
@@ -1019,7 +1114,7 @@ function AdminPage({ page, config, params, profile, navigate, notify }) {
   if (page === "diagnosis-form") return <DiagnosisFormPage config={config} {...common} />;
   if (page === "reports") return <ReportsPage config={config} data={data} />;
   if (page === "schedules") return <SchedulesPage config={config} data={data} />;
-  if (page === "settings") return <SettingsPage config={config} notify={notify} />;
+  if (page === "settings") return <SettingsPage config={config} notify={notify} profile={profile} />;
   return <DashboardPage config={config} {...common} />;
 }
 
@@ -1081,14 +1176,16 @@ async function readOne(clinicId, name, id, fallback) {
 
 function DashboardPage({ config, data, navigate, profile }) {
   const canViewDiagnoses = ["admin", "doctor"].includes(profile.role);
+  const visiblePatients = filterPatientsForUser(data.patients, profile);
+  const visibleDiagnoses = filterDiagnosesForUser(data.diagnoses, visiblePatients, profile);
   return (
     <>
       <PageHeader config={config} />
       <div className="grid stats">
         <StatCard label="Staff" value={data.doctors.length + data.users.filter((item) => normalizeRole(item.role || item.staffType) === "receptionist").length} note="Doctors and receptionists" color="cyan" />
-        <StatCard label="Patients" value={data.patients.length} note="Protected records" color="teal" />
-        {canViewDiagnoses ? <StatCard label="Diagnoses" value={data.diagnoses.length} note="Clinical records" color="blue" /> : null}
-        <StatCard label="Critical" value={data.patients.filter((item) => String(item.status).toLowerCase().includes("critical")).length} note="Needs review" color="rose" />
+        <StatCard label="Patients" value={visiblePatients.length} note={profile.role === "doctor" ? "Assigned to you" : "Protected records"} color="teal" />
+        {canViewDiagnoses ? <StatCard label="Diagnoses" value={visibleDiagnoses.length} note="Clinical records" color="blue" /> : null}
+        <StatCard label="Critical" value={visiblePatients.filter((item) => String(item.status).toLowerCase().includes("critical")).length} note="Needs review" color="rose" />
       </div>
       <div className="grid two">
         <button className="panel pad panel-link" type="button" onClick={() => navigate("doctors")}><h2 className="panel-title">Staff Directory</h2><p className="page-subtitle">Doctors, receptionists, departments, contact details, and room assignments.</p></button>
@@ -1357,6 +1454,7 @@ function DoctorFormPage({ config, data, params, profile, navigate, saveRecord, n
   const clinicId = profile.clinicId || defaultClinicId;
   const [doctor, setDoctor] = useState(data.doctors.find((item) => recordId(item) === id) || {});
   const [busy, setBusy] = useState(false);
+  const settings = useSystemSettings(clinicId);
 
   useEffect(() => {
     let alive = true;
@@ -1379,7 +1477,11 @@ function DoctorFormPage({ config, data, params, profile, navigate, saveRecord, n
       delete payload.photoFile;
       delete payload.temporaryPassword;
       payload.gender = normalizeGender(payload.gender);
+      payload.profession = payload.specialty || payload.profession || "";
 
+      if (!payload.specialty) {
+        throw new Error("Specialty is required. Add specialties in Settings if your option is missing.");
+      }
       if (!id) {
         if (!payload.email) {
           throw new Error("Doctor email is required to create the Firebase Auth account.");
@@ -1444,8 +1546,20 @@ function DoctorFormPage({ config, data, params, profile, navigate, saveRecord, n
             </FormSection>
           ) : null}
           <FormSection title="Professional Details">
-            <Field label="Specialty" name="specialty" defaultValue={doctor.specialty} />
-            <Field label="Department" name="department" defaultValue={doctor.department} />
+            <SelectField
+              label="Specialty / Profession"
+              name="specialty"
+              options={[...new Set([...(settings.specialtyList || DEFAULT_SPECIALTIES), doctor.specialty].filter(Boolean))]}
+              defaultValue={doctor.specialty || ""}
+              placeholder="Select specialty"
+            />
+            <SelectField
+              label="Department"
+              name="department"
+              options={[...new Set([...(settings.departmentList || DEFAULT_DEPARTMENTS), doctor.department].filter(Boolean))]}
+              defaultValue={doctor.department || ""}
+              placeholder="Select department"
+            />
             <SelectField label="Status" name="status" options={["Available", "Busy", "Off Duty"]} defaultValue={doctor.status || "Available"} />
           </FormSection>
           <FormSection title="Availability">
@@ -1489,11 +1603,16 @@ function DoctorDetailPage({ config, data, params, navigate, profile }) {
 function PatientsPage({ config, data, navigate, removeRecord, profile, deletingKey }) {
   const [search, setSearch] = useState("");
   const canEdit = ["admin", "doctor", "receptionist"].includes(profile.role);
-  const patients = useMemo(() => data.patients.filter((patient) => `${patient.patientId || patient.id} ${patientName(patient)} ${patient.phone || ""} ${patient.assignedDoctorName || ""}`.toLowerCase().includes(search.toLowerCase())), [data.patients, search]);
+  const visiblePatients = useMemo(() => filterPatientsForUser(data.patients, profile), [data.patients, profile]);
+  const patients = useMemo(() => visiblePatients.filter((patient) => `${patient.patientId || patient.id} ${patientName(patient)} ${patient.phone || ""} ${patient.assignedDoctorName || ""}`.toLowerCase().includes(search.toLowerCase())), [visiblePatients, search]);
+  const scopeNotice = profile.role === "doctor"
+    ? <div className="notice">Showing only patients assigned to you or registered by you ({visiblePatients.length} of {data.patients.length}).</div>
+    : null;
 
   return (
     <>
       <PageHeader config={config}>{canEdit ? <button className="btn primary" type="button" onClick={() => navigate("patient-form")}>{icons.plus} Register Patient</button> : null}</PageHeader>
+      {scopeNotice}
       <div className="toolbar">
         <div className="search-field"><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search patients by name, ID, phone, or assigned doctor" /></div>
       </div>
@@ -1531,9 +1650,14 @@ function PatientFormPage({ config, data, params, profile, navigate, saveRecord }
   const id = params.get("id") || "";
   const clinicId = profile.clinicId || defaultClinicId;
   const [draftPatient] = useState(createDraftPatientIdentity);
-  const [patient, setPatient] = useState(data.patients.find((item) => recordId(item) === id) || {});
-  const [selectedDoctorId, setSelectedDoctorId] = useState(() => recordId(findAssignedDoctor(data.doctors, data.patients.find((item) => recordId(item) === id) || {})) || "");
+  const initialPatient = data.patients.find((item) => recordId(item) === id) || {};
+  const [patient, setPatient] = useState(initialPatient);
+  const [selectedDoctorId, setSelectedDoctorId] = useState(() => recordId(findAssignedDoctor(data.doctors, initialPatient)) || (profile.role === "doctor" ? profile.uid : ""));
   const [busy, setBusy] = useState(false);
+
+  if (id && initialPatient && Object.keys(initialPatient).length > 0 && !isPatientVisibleToUser(initialPatient, profile)) {
+    return <AccessDenied navigate={navigate} />;
+  }
 
   useEffect(() => {
     let alive = true;
@@ -1625,10 +1749,12 @@ function PatientFormPage({ config, data, params, profile, navigate, saveRecord }
             <div className="field">
               <label>Assigned Doctor</label>
               <select name="assignedDoctorId" value={selectedDoctorId} onChange={(event) => setSelectedDoctorId(event.target.value)}>
-                <option value="">Select doctor</option>
+                <option value="">Select doctor (name — specialty)</option>
                 {data.doctors.map((doctor) => {
                   const doctorDocId = recordId(doctor);
-                  return <option value={doctorDocId} key={doctorDocId}>{doctorName(doctor)}</option>;
+                  const specialty = doctor.specialty || doctor.profession || doctor.department || "";
+                  const label = specialty ? `${doctorName(doctor)} — ${specialty}` : doctorName(doctor);
+                  return <option value={doctorDocId} key={doctorDocId}>{label}</option>;
                 })}
               </select>
             </div>
@@ -1657,6 +1783,10 @@ function PatientProfilePage({ config, data, params, navigate, profile }) {
     || item.patientPublicId === patient.patientId
     || item.patientName === patientName(patient)
   ));
+
+  if (patientDocId && !isPatientVisibleToUser(patient, profile)) {
+    return <AccessDenied navigate={navigate} />;
+  }
 
   return (
     <>
@@ -1696,13 +1826,19 @@ function PatientProfilePage({ config, data, params, navigate, profile }) {
 function DiagnosesPage({ config, data, navigate, removeRecord, profile, deletingKey }) {
   const canDelete = profile.role === "admin";
   const canAdd = ["admin", "doctor"].includes(profile.role);
+  const visiblePatients = useMemo(() => filterPatientsForUser(data.patients, profile), [data.patients, profile]);
+  const visibleDiagnoses = useMemo(() => filterDiagnosesForUser(data.diagnoses, visiblePatients, profile), [data.diagnoses, visiblePatients, profile]);
+  const scopeNotice = profile.role === "doctor"
+    ? <div className="notice">Showing only diagnoses linked to your patients ({visibleDiagnoses.length} of {data.diagnoses.length}).</div>
+    : null;
   return (
     <>
       <PageHeader config={config}>{canAdd ? <button className="btn primary" type="button" onClick={() => navigate("diagnosis-form")}>{icons.plus} Add Diagnosis</button> : null}</PageHeader>
+      {scopeNotice}
       <div className="panel">
         <ResponsiveTable
           columns={["ICD", "Patient", "Diagnosis", "Findings", "Clinical Notes", "Doctor", "Severity", "Date", "Actions"]}
-          rows={data.diagnoses}
+          rows={visibleDiagnoses}
           empty="No diagnoses found."
           renderRow={(item) => [
             item.icdCode || "-",
@@ -1726,6 +1862,7 @@ function DiagnosisFormPage({ config, data, params, profile, navigate, saveRecord
   const patientIdParam = params.get("patientId") || params.get("id") || "";
   const [selectedPatientId, setSelectedPatientId] = useState(patientIdParam);
   const [busy, setBusy] = useState(false);
+  const settings = useSystemSettings(clinicId);
 
   const allowedPatients = useMemo(() => {
     if (profile.role === "admin") return data.patients;
@@ -1818,7 +1955,7 @@ function DiagnosisFormPage({ config, data, params, profile, navigate, saveRecord
       <div className="panel pad">
         <form onSubmit={handleSubmit} key={patientRecordId || "diagnosis-form"}>
           <datalist id="diagnosisSuggestions">
-            {diseaseSuggestions.map((item) => <option value={item} key={item} />)}
+            {(settings.diagnosesList || diseaseSuggestions).map((item) => <option value={item} key={item} />)}
           </datalist>
           <FormSection title="Patient">
             <div className="field">
@@ -1956,17 +2093,93 @@ function SimpleRecordsPage({ config, title, rows, columns, empty = "No records f
   );
 }
 
-function SettingsPage({ config, notify }) {
+function SettingsPage({ config, notify, profile }) {
+  const clinicId = profile?.clinicId || defaultClinicId;
+  const [raw, setRaw] = useState({ loading: true });
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    async function load() {
+      try {
+        const snapshot = await get(ref(rtdb, "settings/system"));
+        const value = snapshot.exists() ? (snapshot.val() || {}) : {};
+        if (alive) setRaw({ loading: false, ...value });
+      } catch (error) {
+        console.warn("Settings load failed", error);
+        if (alive) setRaw({ loading: false });
+      }
+    }
+    load();
+    return () => { alive = false; };
+  }, [clinicId]);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      const form = new FormData(event.currentTarget);
+      const payload = {
+        clinicName: form.get("clinicName") || "",
+        clinicEmail: form.get("clinicEmail") || "",
+        emergencyPhone: form.get("emergencyPhone") || "",
+        specialties: form.get("specialties") || "",
+        departments: form.get("departments") || "",
+        diagnosesList: form.get("diagnosesList") || "",
+        severityLabels: form.get("severityLabels") || "",
+        updatedAt: serverTimestamp(),
+        updatedBy: profile?.uid || "",
+      };
+      await update(ref(rtdb, "settings/system"), payload);
+      setRaw({ loading: false, ...payload });
+      notify("Settings saved. Dropdowns will reflect the new lists on next page load.");
+    } catch (error) {
+      console.error("Settings save failed", error);
+      notify(error?.message || "Could not save settings.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (raw.loading) {
+    return (<><PageHeader config={config} /><div className="panel pad"><p className="page-subtitle">Loading settings...</p></div></>);
+  }
+
+  const hint = "One per line, or comma-separated. These power the dropdowns shown to staff.";
+
   return (
     <>
       <PageHeader config={config} />
       <div className="panel pad">
-        <form onSubmit={(event) => { event.preventDefault(); notify("Settings saved locally. Connect clinic settings storage next."); }}>
+        <form onSubmit={handleSubmit}>
           <FormSection title="Clinic Profile">
-            <Field label="Clinic Name" name="clinicName" defaultValue="CareTrack Clinic" />
-            <Field label="Default Department" name="department" defaultValue="General Medicine" />
+            <Field label="Clinic Name" name="clinicName" defaultValue={raw.clinicName || "CareTrack Clinic"} />
+            <Field label="Clinic Contact Email" name="clinicEmail" type="email" defaultValue={raw.clinicEmail || ""} />
+            <Field label="Emergency Contact Number" name="emergencyPhone" defaultValue={raw.emergencyPhone || ""} />
           </FormSection>
-          <div className="form-actions"><button className="btn primary" type="submit">Save Settings</button></div>
+          <FormSection title="Doctor Professions / Specialties">
+            <div className="field full">
+              <label>Specialty list</label>
+              <textarea name="specialties" rows={4} defaultValue={raw.specialties || DEFAULT_SPECIALTIES.join(", ")} placeholder="Urology, ENT, Cardiology, ..." />
+              <small>{hint} Receptionists pick from this list when assigning a doctor.</small>
+            </div>
+          </FormSection>
+          <FormSection title="Departments">
+            <div className="field full">
+              <label>Department list</label>
+              <textarea name="departments" rows={3} defaultValue={raw.departments || DEFAULT_DEPARTMENTS.join(", ")} placeholder="Cardiology, Neurology, ..." />
+              <small>{hint}</small>
+            </div>
+          </FormSection>
+          <FormSection title="Illnesses / Diagnoses">
+            <div className="field full">
+              <label>Illness / Diagnosis list</label>
+              <textarea name="diagnosesList" rows={5} defaultValue={raw.diagnosesList || DEFAULT_DIAGNOSES_LIST.join(", ")} placeholder="Hypertension, Tuberculosis, ..." />
+              <small>{hint} Doctors see these as suggestions when filling out a diagnosis.</small>
+            </div>
+            <Field label="Diagnosis Severity Labels" name="severityLabels" defaultValue={raw.severityLabels || "Low, Medium, High, Critical"} />
+          </FormSection>
+          <div className="form-actions"><button className="btn primary" type="submit" disabled={busy}>{busy ? "Saving..." : "Save Settings"}</button></div>
         </form>
       </div>
     </>
