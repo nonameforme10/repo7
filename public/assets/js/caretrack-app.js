@@ -652,7 +652,85 @@ function formPayload(form) {
 }
 
 function doctorOptions(doctors, selected = "") {
-  return doctors.map((doctor) => `<option value="${escapeText(doctor.id)}" ${doctor.id === selected ? "selected" : ""}>${escapeText(doctor.fullName || doctor.doctorName || doctor.name)}</option>`).join("");
+  return doctors.map((doctor) => {
+    const name = doctor.fullName || doctor.doctorName || doctor.name;
+    const specialty = doctor.specialty || doctor.profession || "";
+    const label = specialty ? `${name} — ${specialty}` : name;
+    return `<option value="${escapeText(doctor.id)}" ${doctor.id === selected ? "selected" : ""}>${escapeText(label)}</option>`;
+  }).join("");
+}
+
+function parseList(value) {
+  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
+  return String(value || "")
+    .split(/[,;\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+const DEFAULT_SPECIALTIES = [
+  "Cardiology", "Neurology", "Pediatrics", "General Medicine",
+  "Urology", "Otolaryngology (ENT)", "Dermatology", "Orthopedics",
+  "Gynecology", "Ophthalmology", "Psychiatry", "Endocrinology",
+];
+
+const DEFAULT_DIAGNOSES = [
+  "Hypertension", "Type 2 Diabetes Mellitus", "Pneumonia", "Bronchitis",
+  "Asthma", "Acute Migraine", "Otitis Media", "Influenza",
+  "Urinary Tract Infection", "Gastroesophageal Reflux", "Fracture",
+  "Coronary Artery Disease", "Chronic Kidney Disease", "Anemia",
+  "Anxiety Disorder", "Depression", "Allergic Rhinitis", "Dermatitis",
+  "Osteoarthritis", "Orthopedic aftercare", "Tuberculosis",
+];
+
+const DEFAULT_DEPARTMENTS = [
+  "Cardiology", "Neurology", "Pediatrics", "Orthopedics", "General",
+  "Urology", "ENT", "Dermatology", "Front Desk",
+];
+
+let _settingsCache = null;
+async function getSystemSettings() {
+  if (_settingsCache) return _settingsCache;
+  const stored = await readDoc("settings", "system", {});
+  const specialtyList = parseList(stored.specialties);
+  const diagnosesList = parseList(stored.diagnosesList || stored.diagnoses);
+  const departmentList = parseList(stored.departments);
+  _settingsCache = {
+    ...stored,
+    specialtyList: specialtyList.length ? specialtyList : DEFAULT_SPECIALTIES,
+    diagnosesList: diagnosesList.length ? diagnosesList : DEFAULT_DIAGNOSES,
+    departmentList: departmentList.length ? departmentList : DEFAULT_DEPARTMENTS,
+  };
+  return _settingsCache;
+}
+
+function isPatientVisibleToUser(patient) {
+  const profile = state.profile || {};
+  if (profile.role !== "doctor") return true;
+  const uid = profile.uid;
+  return patient?.assignedDoctorId === uid
+    || patient?.createdBy === uid
+    || patient?.assignedDoctorUid === uid;
+}
+
+function filterPatientsForUser(patients) {
+  if ((state.profile?.role || "") !== "doctor") return patients;
+  return patients.filter((patient) => isPatientVisibleToUser(patient));
+}
+
+function filterDiagnosesForUser(diagnoses, visiblePatients) {
+  if ((state.profile?.role || "") !== "doctor") return diagnoses;
+  const uid = state.profile?.uid;
+  const visibleIds = new Set();
+  (visiblePatients || []).forEach((patient) => {
+    if (patient.id) visibleIds.add(patient.id);
+    if (patient.patientId) visibleIds.add(patient.patientId);
+  });
+  return diagnoses.filter((dx) =>
+    dx.assignedDoctorId === uid
+    || dx.createdBy === uid
+    || visibleIds.has(dx.patientId)
+  );
 }
 
 function patientName(patient) {
@@ -691,13 +769,15 @@ function bindRecordForm(selector, collectionName, transform, successUrl) {
 async function renderDashboard(config) {
   const canViewDiagnoses = can(["admin", "doctor"]);
   const canViewAudit = can(["admin"]);
-  const [doctors, patients, diagnoses, auditLogs, users] = await Promise.all([
+  const [doctors, allPatients, allDiagnoses, auditLogs, users] = await Promise.all([
     readDocs("doctors", samples.doctors),
     readDocs("patients", samples.patients),
     canViewDiagnoses ? readDocs("diagnoses", samples.diagnoses) : Promise.resolve([]),
     canViewAudit ? readDocs("auditLogs", samples.auditLogs, { orderBy: ["timestamp", "desc"], limit: 5 }) : Promise.resolve([]),
     readRtdUsers(),
   ]);
+  const patients = filterPatientsForUser(allPatients);
+  const diagnoses = filterDiagnosesForUser(allDiagnoses, patients);
   const critical = patients.filter((patient) => String(patient.status || "").toLowerCase().includes("critical")).length;
   const receptionistCount = users.filter((user) => normalizeRole(user.role || user.staffType) === "receptionist").length;
   const actions = html`
@@ -799,9 +879,10 @@ function mergeDoctorSources(doctors = [], staffUsers = []) {
 }
 
 async function renderDoctors(config) {
-  const [storedDoctors, rtdUsers] = await Promise.all([
+  const [storedDoctors, rtdUsers, settings] = await Promise.all([
     readDocs("doctors", samples.doctors),
     readRtdUsers(),
+    getSystemSettings(),
   ]);
   const staffUsers = rtdUsers.length ? rtdUsers : (state.demoMode ? samples.users : []);
   const doctors = mergeDoctorSources(storedDoctors, rtdUsers);
@@ -821,7 +902,7 @@ async function renderDoctors(config) {
       <div class="panel-header"><h2 class="panel-title">Receptionists</h2></div>
       ${receptionistsTable(receptionists)}
     </div>
-    ${can(["admin"]) ? staffFormModal() : ""}`;
+    ${can(["admin"]) ? staffFormModal(settings) : ""}`;
 }
 
 function doctorsTable(doctors) {
@@ -870,14 +951,16 @@ function receptionistsTable(receptionists) {
     </div>`;
 }
 
-function staffFormModal() {
+function staffFormModal(settings = { specialtyList: DEFAULT_SPECIALTIES, departmentList: DEFAULT_DEPARTMENTS }) {
+  const specialtyOptions = (settings.specialtyList || DEFAULT_SPECIALTIES).map((item) => `<option value="${escapeText(item)}">${escapeText(item)}</option>`).join("");
+  const departmentOptions = (settings.departmentList || DEFAULT_DEPARTMENTS).map((item) => `<option value="${escapeText(item)}">${escapeText(item)}</option>`).join("");
   return html`
     <div class="modal-backdrop" id="staffModal" hidden>
       <div class="modal-window" role="dialog" aria-modal="true" aria-labelledby="staffModalTitle">
         <div class="modal-header">
           <div>
             <h2 class="panel-title" id="staffModalTitle">Add Staff</h2>
-            <p class="panel-subtitle">Create a doctor or receptionist account.</p>
+            <p class="panel-subtitle">Create a doctor or receptionist account. Specialties and departments come from System Settings.</p>
           </div>
           <button class="icon-button" type="button" data-close-staff-modal aria-label="Close">${icons.close}</button>
         </div>
@@ -889,14 +972,14 @@ function staffFormModal() {
               <div class="field"><label>Full Name</label><input name="displayName" required></div>
               <div class="field"><label>Email</label><input name="email" type="email" required></div>
               <div class="field"><label>Temporary Password</label><input name="temporaryPassword" type="password" minlength="8" required></div>
-              <div class="field"><label>Department</label><input name="department" id="staffDepartment" value="General"></div>
+              <div class="field"><label>Department</label><select name="department" id="staffDepartment"><option value="">Select department</option>${departmentOptions}</select></div>
               <div class="field"><label>Status</label><select name="active"><option value="true">Active</option><option value="false">Disabled</option></select></div>
             </div>
           </section>
           <section class="form-section" id="staffDoctorFields">
             <h3>Doctor Profile</h3>
             <div class="form-grid">
-              <div class="field"><label>Specialty</label><input name="specialty" value="General Medicine"></div>
+              <div class="field"><label>Specialty / Profession</label><select name="specialty" id="staffSpecialty"><option value="">Select specialty</option>${specialtyOptions}</select></div>
               <div class="field"><label>Phone Number</label><input name="phone"></div>
               <div class="field"><label>Office Room</label><input name="room"></div>
               <div class="field"><label>Available Days</label><input name="availability" value="Mon-Fri"></div>
@@ -917,7 +1000,10 @@ function staffFormModal() {
 async function renderDoctorForm(config) {
   const id = getParam("id");
   const fallback = samples.doctors.find((item) => item.id === id) || {};
-  const doctor = await readDoc("doctors", id, fallback);
+  const [doctor, settings] = await Promise.all([
+    readDoc("doctors", id, fallback),
+    getSystemSettings(),
+  ]);
   const title = id ? "Edit Doctor" : "Add Doctor";
   return html`
     ${pageHeader({ ...config, title }, `<a class="btn" href="${pageUrl("doctors")}">Cancel</a>`)}
@@ -934,8 +1020,8 @@ async function renderDoctorForm(config) {
           field("Temporary Password", "temporaryPassword", "", "password"),
         ]) : ""}
         ${formSection("Professional Details", [
-          field("Specialty", "specialty", doctor.specialty || ""),
-          field("Department", "department", doctor.department || ""),
+          selectFromList("Specialty / Profession", "specialty", settings.specialtyList, doctor.specialty || ""),
+          selectFromList("Department", "department", settings.departmentList, doctor.department || ""),
           selectField("Status", "status", ["Available", "Busy", "Off Duty"], doctor.status || "Available"),
         ])}
         ${formSection("Availability", [
@@ -980,10 +1066,15 @@ async function renderDoctorDetail(config) {
 }
 
 async function renderPatients(config) {
-  const patients = await readDocs("patients", samples.patients);
+  const allPatients = await readDocs("patients", samples.patients);
+  const patients = filterPatientsForUser(allPatients);
   const actions = can(["admin", "doctor", "receptionist"]) ? `<a class="btn primary" href="${pageUrl("patient-form")}">${icons.plus} Register Patient</a>` : "";
+  const scopeNotice = state.profile?.role === "doctor"
+    ? `<div class="notice">Showing only patients assigned to you or registered by you (${patients.length} of ${allPatients.length}).</div><br>`
+    : "";
   return html`
     ${pageHeader(config, actions)}
+    ${scopeNotice}
     <div class="toolbar">
       <div class="search-field"><input data-filter-table="patientsTable" placeholder="Search patients by name, ID, phone, or assigned doctor"></div>
       <div class="field"><select><option>All Doctors</option><option>Dr. James Wilson</option><option>Dr. Sarah Chen</option></select></div>
@@ -1027,10 +1118,15 @@ function ageFromDob(dob) {
 async function renderPatientForm(config) {
   const id = getParam("id");
   const fallback = samples.patients.find((item) => item.id === id) || {};
-  const [patient, doctors] = await Promise.all([
+  const [patient, doctors, settings] = await Promise.all([
     readDoc("patients", id, fallback),
     readDocs("doctors", samples.doctors),
+    getSystemSettings(),
   ]);
+  if (id && patient && !isPatientVisibleToUser(patient)) {
+    redirectDenied("patient-scope");
+    return "";
+  }
   return html`
     ${pageHeader(config, `<a class="btn" href="${pageUrl("patients")}">Cancel</a>`)}
     <div class="panel pad">
@@ -1052,8 +1148,8 @@ async function renderPatientForm(config) {
           field("Emergency Contact Phone", "emergencyContactPhone", patient.emergencyContactPhone || ""),
         ])}
         ${formSection("Doctor Assignment", [
-          `<div class="field"><label>Assigned Doctor</label><select name="assignedDoctorId"><option value="">Select doctor</option>${doctorOptions(doctors, patient.assignedDoctorId)}</select></div>`,
-          field("Department", "department", patient.department || ""),
+          `<div class="field"><label>Assigned Doctor</label><select name="assignedDoctorId" required><option value="">Select doctor (name — specialty)</option>${doctorOptions(doctors, patient.assignedDoctorId || (state.profile?.role === "doctor" ? state.profile.uid : ""))}</select></div>`,
+          selectFromList("Department", "department", settings.departmentList, patient.department || ""),
           `<div class="field full"><label>Registration Notes</label><textarea name="registrationNotes">${escapeText(patient.registrationNotes || "")}</textarea></div>`,
         ])}
         <div class="notice">Patient data is stored securely and visible only to authorized clinic staff.</div>
@@ -1067,6 +1163,10 @@ async function renderPatientProfile(config) {
   const patients = await readDocs("patients", samples.patients);
   const id = getParam("id") || patients[0]?.id;
   const patient = await readDoc("patients", id, patients.find((item) => item.id === id) || patients[0]);
+  if (patient && !isPatientVisibleToUser(patient)) {
+    redirectDenied("patient-scope");
+    return "";
+  }
   const [doctors, diagnoses] = await Promise.all([
     readDocs("doctors", samples.doctors),
     canViewDiagnoses ? readDocs("diagnoses", samples.diagnoses) : Promise.resolve([]),
@@ -1095,10 +1195,19 @@ async function renderPatientProfile(config) {
 }
 
 async function renderDiagnoses(config) {
-  const diagnoses = await readDocs("diagnoses", samples.diagnoses);
+  const [allDiagnoses, allPatients] = await Promise.all([
+    readDocs("diagnoses", samples.diagnoses),
+    readDocs("patients", samples.patients),
+  ]);
+  const visiblePatients = filterPatientsForUser(allPatients);
+  const diagnoses = filterDiagnosesForUser(allDiagnoses, visiblePatients);
   const actions = can(["admin", "doctor"]) ? `<a class="btn primary" href="${pageUrl("diagnosis-form")}">${icons.plus} Add Diagnosis</a>` : "";
+  const scopeNotice = state.profile?.role === "doctor"
+    ? `<div class="notice">Showing only diagnoses linked to your patients (${diagnoses.length} of ${allDiagnoses.length}).</div><br>`
+    : "";
   return html`
     ${pageHeader(config, actions)}
+    ${scopeNotice}
     <div class="toolbar">
       <div class="search-field"><input data-filter-table="diagnosesTable" placeholder="Search by ICD code, patient name, or diagnosis"></div>
       <div class="field"><select><option>All Severity</option><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select></div>
@@ -1134,12 +1243,19 @@ async function renderDiagnosisForm(config) {
   const id = getParam("id");
   const patientId = getParam("patientId");
   const fallback = samples.diagnoses.find((item) => item.id === id) || {};
-  const [diagnosis, patients, doctors] = await Promise.all([
+  const [diagnosis, allPatients, doctors, settings] = await Promise.all([
     readDoc("diagnoses", id, fallback),
     readDocs("patients", samples.patients),
     readDocs("doctors", samples.doctors),
+    getSystemSettings(),
   ]);
+  const patients = filterPatientsForUser(allPatients);
   const selectedPatient = patients.find((item) => item.id === (diagnosis?.patientId || patientId) || item.patientId === (diagnosis?.patientId || patientId));
+  if (diagnosis?.patientId && !selectedPatient && state.profile?.role === "doctor") {
+    redirectDenied("patient-scope");
+    return "";
+  }
+  const diagnosesOptions = (settings.diagnosesList || DEFAULT_DIAGNOSES).map((item) => `<option value="${escapeText(item)}">`).join("");
   return html`
     ${pageHeader(config, `<a class="btn" href="${pageUrl("diagnoses")}">Cancel</a>`)}
     <div class="panel pad">
@@ -1151,7 +1267,7 @@ async function renderDiagnosisForm(config) {
         ])}
         ${formSection("Diagnosis Details", [
           `<div class="field"><label>ICD Code</label><input name="icdCode" value="${escapeText(diagnosis?.icdCode || "")}" pattern="^[A-Za-z][0-9]{2}(\\.[0-9]{1,4})?$" title="Valid ICD-10 format: letter + 2 digits, optional .digits (e.g. A15.0, J18.9)" placeholder="e.g. A15.0, J18.9"></div>`,
-          `<div class="field"><label>Diagnosis Description</label><input name="description" value="${escapeText(diagnosis?.description || "")}" list="commonDiagnosesList"><datalist id="commonDiagnosesList"><option value="Hypertension"><option value="Type 2 Diabetes Mellitus"><option value="Pneumonia"><option value="Bronchitis"><option value="Asthma"><option value="Acute Migraine"><option value="Otitis Media"><option value="Influenza"><option value="Urinary Tract Infection"><option value="Gastroesophageal Reflux"><option value="Fracture"><option value="Coronary Artery Disease"><option value="Chronic Kidney Disease"><option value="Anemia"><option value="Anxiety Disorder"><option value="Depression"><option value="Allergic Rhinitis"><option value="Dermatitis"><option value="Osteoarthritis"><option value="Orthopedic aftercare"></datalist></div>`,
+          `<div class="field"><label>Diagnosis Description</label><input name="description" value="${escapeText(diagnosis?.description || "")}" list="commonDiagnosesList" placeholder="Start typing or pick a configured illness"><datalist id="commonDiagnosesList">${diagnosesOptions}</datalist></div>`,
           selectField("Severity Level", "severity", ["Low", "Medium", "High", "Critical"], diagnosis?.severity || "Medium"),
           field("Diagnosis Date", "diagnosisDate", diagnosis?.diagnosisDate || new Date().toISOString().slice(0, 10), "date"),
         ])}
@@ -1204,6 +1320,10 @@ async function renderPatientReport(config) {
   const patients = await readDocs("patients", samples.patients);
   const id = getParam("id") || patients[0]?.id;
   const patient = await readDoc("patients", id, patients.find((item) => item.id === id) || patients[0]);
+  if (patient && !isPatientVisibleToUser(patient)) {
+    redirectDenied("patient-scope");
+    return "";
+  }
   const [doctors, diagnoses] = await Promise.all([readDocs("doctors", samples.doctors), readDocs("diagnoses", samples.diagnoses)]);
   const doctor = doctors.find((item) => item.id === patient?.assignedDoctorId || doctorName(item) === patient?.assignedDoctorName) || doctors[0];
   const rows = diagnoses.filter((item) => item.patientId === patient?.id || item.patientId === patient?.patientId || item.patientName === patientName(patient));
@@ -1281,19 +1401,49 @@ async function renderSettings(config) {
     clinicName: "CareTrack Clinic",
     clinicEmail: "admin@caretrack.test",
     emergencyPhone: "+1 555 0100",
-    departments: "Cardiology, Neurology, Pediatrics, Orthopedics, General",
-    specialties: "Cardiology, Neurology, Pediatrics, General Medicine",
+    departments: DEFAULT_DEPARTMENTS.join(", "),
+    specialties: DEFAULT_SPECIALTIES.join(", "),
+    diagnosesList: DEFAULT_DIAGNOSES.join(", "),
     severityLabels: "Low, Medium, High, Critical",
     sessionTimeout: "60",
   });
+  const listHint = "One per line, or comma-separated. These power the dropdowns shown to staff.";
   return html`
     ${pageHeader(config)}
     <div class="panel pad">
       <form id="settingsForm">
         <input type="hidden" name="id" value="system">
-        ${formSection("Clinic Profile", [field("Clinic Name", "clinicName", settings.clinicName), field("Clinic Contact Email", "clinicEmail", settings.clinicEmail, "email"), field("Emergency Contact Number", "emergencyPhone", settings.emergencyPhone)])}
-        ${formSection("Departments and Specialties", [field("Department list", "departments", settings.departments, "text", true), field("Specialty list", "specialties", settings.specialties, "text", true), field("Diagnosis Severity Labels", "severityLabels", settings.severityLabels, "text", true)])}
-        ${formSection("Security Settings", [field("Session timeout", "sessionTimeout", settings.sessionTimeout, "number"), `<div class="field"><label>Data Backup</label><button class="btn" type="button">Export Backup</button></div>`])}
+        ${formSection("Clinic Profile", [
+          field("Clinic Name", "clinicName", settings.clinicName),
+          field("Clinic Contact Email", "clinicEmail", settings.clinicEmail, "email"),
+          field("Emergency Contact Number", "emergencyPhone", settings.emergencyPhone),
+        ])}
+        <section class="form-section">
+          <h3>Doctor Professions / Specialties</h3>
+          <p class="page-subtitle">${escapeText(listHint)} Receptionists will pick from this list when assigning a doctor.</p>
+          <div class="form-grid">
+            <div class="field full"><label>Specialty list</label><textarea name="specialties" rows="4" placeholder="Urologist, ENT, Cardiology...">${escapeText(settings.specialties || "")}</textarea></div>
+          </div>
+        </section>
+        <section class="form-section">
+          <h3>Departments</h3>
+          <p class="page-subtitle">${escapeText(listHint)}</p>
+          <div class="form-grid">
+            <div class="field full"><label>Department list</label><textarea name="departments" rows="3">${escapeText(settings.departments || "")}</textarea></div>
+          </div>
+        </section>
+        <section class="form-section">
+          <h3>Illnesses / Diagnoses</h3>
+          <p class="page-subtitle">${escapeText(listHint)} Doctors see these when filling out a diagnosis.</p>
+          <div class="form-grid">
+            <div class="field full"><label>Illness / Diagnosis list</label><textarea name="diagnosesList" rows="5">${escapeText(settings.diagnosesList || settings.diagnoses || "")}</textarea></div>
+            <div class="field full"><label>Diagnosis Severity Labels</label><input name="severityLabels" value="${escapeText(settings.severityLabels || "")}"></div>
+          </div>
+        </section>
+        ${formSection("Security Settings", [
+          field("Session timeout", "sessionTimeout", settings.sessionTimeout, "number"),
+          `<div class="field"><label>Data Backup</label><button class="btn" type="button">Export Backup</button></div>`,
+        ])}
         <div class="form-actions"><button class="btn" type="reset">Cancel</button><button class="btn primary" type="submit">Save Settings</button></div>
       </form>
     </div>`;
@@ -1337,6 +1487,12 @@ function field(label, name, value = "", type = "text", full = false) {
 
 function selectField(label, name, options, selected = "") {
   return html`<div class="field"><label>${escapeText(label)}</label><select name="${escapeText(name)}">${options.map((item) => `<option value="${escapeText(item)}" ${String(item) === String(selected) ? "selected" : ""}>${escapeText(item)}</option>`).join("")}</select></div>`;
+}
+
+function selectFromList(label, name, list, selected = "", placeholder = "Select an option") {
+  const options = [...new Set([...(list || []), selected].filter(Boolean))];
+  const placeholderOption = `<option value="">${escapeText(placeholder)}</option>`;
+  return html`<div class="field"><label>${escapeText(label)}</label><select name="${escapeText(name)}">${placeholderOption}${options.map((item) => `<option value="${escapeText(item)}" ${String(item) === String(selected) ? "selected" : ""}>${escapeText(item)}</option>`).join("")}</select></div>`;
 }
 
 function infoRow(label, value = "-") {
@@ -1386,6 +1542,7 @@ function bindPageBehavior() {
 
     return {
       ...data,
+      profession: data.specialty || data.profession || "",
       assignedPatients: Number(data.assignedPatients || 0),
     };
   }, pageUrl("doctors"));
@@ -1448,6 +1605,7 @@ function bindPageBehavior() {
   const staffRoleSelect = document.getElementById("staffRoleSelect");
   const staffDoctorFields = document.getElementById("staffDoctorFields");
   const staffDepartment = document.getElementById("staffDepartment");
+  const staffSpecialty = document.getElementById("staffSpecialty");
   function setStaffModalOpen(open) {
     if (!staffModal) return;
     staffModal.hidden = !open;
@@ -1455,8 +1613,11 @@ function bindPageBehavior() {
   function syncStaffRoleFields() {
     const role = staffRoleSelect?.value === "receptionist" ? "receptionist" : "doctor";
     if (staffDoctorFields) staffDoctorFields.hidden = role !== "doctor";
-    if (staffDepartment && (!staffDepartment.value || ["General", "Front Desk"].includes(staffDepartment.value))) {
-      staffDepartment.value = role === "doctor" ? "General" : "Front Desk";
+    if (staffSpecialty) staffSpecialty.disabled = role !== "doctor";
+    if (staffDepartment && !staffDepartment.value) {
+      const preferred = role === "doctor" ? "General" : "Front Desk";
+      const hasOption = [...staffDepartment.options].some((opt) => opt.value === preferred);
+      if (hasOption) staffDepartment.value = preferred;
     }
   }
   document.getElementById("openStaffModal")?.addEventListener("click", () => setStaffModalOpen(true));
@@ -1477,6 +1638,10 @@ function bindPageBehavior() {
     const temporaryPassword = String(data.temporaryPassword || "").trim();
     if (temporaryPassword.length < 8) {
       toast("Temporary password must be at least 8 characters.");
+      return;
+    }
+    if (staffType === "doctor" && !String(data.specialty || "").trim()) {
+      toast("Pick a specialty for this doctor. Add new specialties in System Settings.");
       return;
     }
     const button = staffForm.querySelector("[type=submit]");
@@ -1504,6 +1669,7 @@ function bindPageBehavior() {
           phone: data.phone || "",
           room: data.room || "",
           specialty: data.specialty || "General Medicine",
+          profession: data.specialty || "General Medicine",
           department: data.department || data.specialty || "General",
           status: data.status || "Available",
           availability: data.availability || "",
